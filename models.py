@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from typing import Dict, Any
 
 db = SQLAlchemy()
 
@@ -26,7 +27,7 @@ class StockStrategy(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow, comment='策略修正时间')
     is_active = db.Column(db.Boolean, nullable=False, default=True, comment='策略是否有效')
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         """将模型转换为字典"""
         return {
             'id': self.id,
