@@ -1,13 +1,18 @@
 # 环境变量文件
 .env
 
+# Python virtual environment
+venv/
+env/
+.env/
+.venv/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
