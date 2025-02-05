@@ -36,3 +36,9 @@ wheels/
 # 数据库文件
 *.sqlite
 *.db 
+
+# Python virtual environment
+venv/
+env/
+.env/
+.venv/
