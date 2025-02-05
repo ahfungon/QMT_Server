@@ -1,11 +1,15 @@
 # 环境变量文件
 .env
+.env.*
+!.env.example
 
-# Python virtual environment
+# Python 虚拟环境
 venv/
 env/
-.env/
 .venv/
+.env/
+ENV/
+pythonenv*/
 
 # Python
 __pycache__/
@@ -28,22 +32,23 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.swn
+.DS_Store
 
 # 日志文件
 *.log
+logs/
+log/
 
 # 数据库文件
 *.sqlite
-*.db 
-
-# Python virtual environment
-venv/
-env/
-.env/
-.venv/
+*.sqlite3
+*.db
+*.db-journal
