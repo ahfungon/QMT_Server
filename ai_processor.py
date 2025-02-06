@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from typing import Dict, Any
 from zhipuai import ZhipuAI
 
@@ -7,6 +8,10 @@ class AIStrategyProcessor:
     def __init__(self):
         self.api_key = os.getenv('ZHIPU_API_KEY')
         self.client = ZhipuAI(api_key=self.api_key)
+        
+        # 配置日志记录
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
         
         # 系统提示词
         self.system_prompt = """你是一个专业的股票交易策略分析助手。你的任务分为两个步骤：
@@ -142,12 +147,16 @@ class AIStrategyProcessor:
         try:
             from jsonschema import validate, ValidationError
             validate(instance=data, schema=self.schema)
+            self.logger.info("JSON Schema 验证通过")
             return True
+        except ImportError:
+            self.logger.error("jsonschema 模块未安装")
+            return False
         except ValidationError as e:
-            print(f"\n[Schema验证失败] {str(e)}")
+            self.logger.error(f"Schema验证失败: {str(e)}")
             return False
         except Exception as e:
-            print(f"\n[Schema验证异常] {str(e)}")
+            self.logger.error(f"Schema验证异常: {str(e)}")
             return False
 
     def call_ai_api(self, user_input: str, retry_count: int = 0) -> Dict[str, Any]:
@@ -170,22 +179,23 @@ class AIStrategyProcessor:
                 })
             
             # 调用智谱 AI 接口
-            print(f"\n[调用AI] 发送请求... (第 {retry_count + 1} 次尝试)")
+            self.logger.info(f"调用AI (第 {retry_count + 1} 次尝试)")
             response = self.client.chat.completions.create(
                 model="glm-4",
                 messages=messages,
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=2000
             )
             
             # 获取返回的文本内容
             content = response.choices[0].message.content.strip()
-            print(f"\n[AI响应] 原始内容:\n{content}")
+            self.logger.info(f"AI响应原始内容:\n{content}")
             
             # 提取和清理 JSON
             import re
             json_match = re.search(r'\{[^{]*\}', content, re.DOTALL)
             if not json_match:
-                print("\n[错误] 未找到有效的 JSON 数据")
+                self.logger.error("未找到有效的 JSON 数据")
                 return self.call_ai_api(user_input, retry_count + 1)
             
             content = json_match.group()
@@ -193,23 +203,24 @@ class AIStrategyProcessor:
             content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
             content = '\n'.join(line.strip() for line in content.splitlines() if line.strip())
             
-            print(f"\n[JSON清理] 清理后的JSON:\n{content}")
+            self.logger.info(f"清理后的JSON:\n{content}")
             
             try:
                 result = json.loads(content)
+                self.logger.info(f"JSON解析成功:\n{json.dumps(result, ensure_ascii=False, indent=2)}")
             except json.JSONDecodeError as e:
-                print(f"\n[错误] JSON 解析失败: {str(e)}")
+                self.logger.error(f"JSON 解析失败: {str(e)}")
                 return self.call_ai_api(user_input, retry_count + 1)
             
             # 验证 JSON Schema
             if not self.validate_json_schema(result):
-                print("\n[错误] JSON Schema 验证失败，将重试")
+                self.logger.error("JSON Schema 验证失败，将重试")
                 return self.call_ai_api(user_input, retry_count + 1)
             
             return result
             
         except Exception as e:
-            print(f"\n[错误] API 调用失败: {str(e)}")
+            self.logger.error(f"API 调用失败: {str(e)}")
             return self.call_ai_api(user_input, retry_count + 1)
 
     def process_strategy(self, user_input: str) -> Dict[str, Any]:
