@@ -14,24 +14,24 @@ class AIStrategyProcessor:
         self.logger = logging.getLogger(__name__)
         
         # 系统提示词
-        self.system_prompt = """你是一个专业的股票交易策略分析助手。你的任务分为两个步骤：
+        self.system_prompt = """你是一个专业的股票交易策略分析助手。你的任务是分析用户输入的策略文本，并提取关键信息。
 
-第一步：严格判断用户输入是否包含以下要素：
-1. 明确提到股票名称或股票代码
-2. 明确提到交易意图（买入/卖出）
-3. 提到具体的交易条件（如价格、仓位等）
+第一步：判断用户输入是否包含以下要素中的至少两个：
+1. 股票名称或股票代码
+2. 交易相关信息（如价格区间、仓位、止盈止损等）
+3. 交易理由或分析（如技术面、基本面分析等）
 
-如果用户输入缺少以上任一要素，或者完全与股票交易无关（比如谈论天气、生活等），请直接返回：
+如果用户输入与股票交易完全无关（比如谈论天气、生活等），请直接返回：
 {
     "error": "与股票交易无关，暂不处理"
 }
 
-第二步：只有当用户输入同时满足上述所有要素时，才进行策略解析，将用户输入转换为以下格式的JSON数据：
+第二步：如果用户输入包含足够的交易相关信息，进行策略解析，将用户输入转换为以下格式的JSON数据：
 
 {
     "stock_name": "股票名称（字符串）",
     "stock_code": "股票代码（6位数字字符串）",
-    "action": "buy或sell（字符串）",
+    "action": "buy或sell（字符串），如果不确定则填null",
     "position_ratio": 0.5,
     "price_min": 10.5,
     "price_max": 11.0,
@@ -44,7 +44,7 @@ class AIStrategyProcessor:
 字段说明：
 - stock_name：必填，字符串类型
 - stock_code：必填，6位数字字符串
-- action：必填，只能是"buy"或"sell"
+- action：选填，只能是"buy"、"sell"或null
 - position_ratio：必填，0到1之间的小数，表示仓位比例
 - price_min：选填，数字类型，最小执行价格
 - price_max：选填，数字类型，最大执行价格
@@ -66,16 +66,10 @@ class AIStrategyProcessor:
 1. 输入："今天天气真好"
 输出：{"error": "与股票交易无关，暂不处理"}
 
-2. 输入："股市行情不错"
+2. 输入："茅台现在多少钱"
 输出：{"error": "与股票交易无关，暂不处理"}
 
-3. 输入："我想买股票"
-输出：{"error": "与股票交易无关，暂不处理"}
-
-4. 输入："茅台现在多少钱"
-输出：{"error": "与股票交易无关，暂不处理"}
-
-5. 输入："以30元买入平安银行(000001)，仓位30%，止盈34元，止损28元"
+3. 输入："以30元买入平安银行(000001)，仓位30%，止盈34元，止损28元"
 输出：
 {
     "stock_name": "平安银行",
@@ -90,19 +84,19 @@ class AIStrategyProcessor:
     "reason": null
 }
 
-6. 输入："卖出国科微(300672)，仓位10%，价格区间64.8-65元，止盈69元，止损59元，理由是技术面转弱"
+4. 输入："国科微(300672)的分析：价格区间64.8-65元，建议仓位10%，止盈69元，止损59元。公司在SoC芯片领域有优势。"
 输出：
 {
     "stock_name": "国科微",
     "stock_code": "300672",
-    "action": "sell",
+    "action": null,
     "position_ratio": 0.1,
     "price_min": 64.8,
     "price_max": 65,
     "take_profit_price": 69,
     "stop_loss_price": 59,
     "other_conditions": null,
-    "reason": "技术面转弱"
+    "reason": "公司在SoC芯片领域有优势"
 }"""
 
         # 定义 JSON Schema
@@ -116,8 +110,8 @@ class AIStrategyProcessor:
                     "pattern": "^\\d{6}$"
                 },
                 "action": {
-                    "type": "string",
-                    "enum": ["buy", "sell"]
+                    "type": ["string", "null"],
+                    "enum": ["buy", "sell", None]
                 },
                 "position_ratio": {
                     "type": "number",
@@ -136,7 +130,7 @@ class AIStrategyProcessor:
                     "required": ["error"]
                 },
                 {
-                    "required": ["stock_name", "stock_code", "action", "position_ratio"]
+                    "required": ["stock_name", "stock_code", "position_ratio"]
                 }
             ],
             "additionalProperties": False
@@ -226,21 +220,21 @@ class AIStrategyProcessor:
     def process_strategy(self, user_input: str) -> Dict[str, Any]:
         """处理用户输入的策略文本"""
         try:
-            print("\n" + "="*50)
-            print(f"[用户输入] {user_input}")
+            self.logger.info("="*50)
+            self.logger.info(f"用户输入: {user_input}")
             
             # 调用 AI API 并获取结果
             result = self.call_ai_api(user_input)
             
-            print("\n[处理结果] 策略解析成功")
-            print(f"{json.dumps(result, ensure_ascii=False, indent=2)}")
-            print("="*50 + "\n")
+            self.logger.info("处理结果: 策略解析成功")
+            self.logger.info(f"{json.dumps(result, ensure_ascii=False, indent=2)}")
+            self.logger.info("="*50)
             return result
             
         except Exception as e:
             error_msg = f"策略处理失败: {str(e)}"
-            print(f"\n[错误] {error_msg}")
-            print("="*50 + "\n")
+            self.logger.error(error_msg)
+            self.logger.info("="*50)
             raise Exception(error_msg)
 
     def extract_stock_code(self, text: str) -> str:
