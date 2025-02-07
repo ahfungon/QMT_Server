@@ -5,6 +5,7 @@
 """
 
 import os
+from pathlib import Path
 from flask import Flask
 from dotenv import load_dotenv
 from config import config
@@ -12,7 +13,8 @@ from .models import db
 from .utils.logger import setup_logger
 
 # 加载环境变量（确保最先加载）
-load_dotenv(override=True)
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(env_path, override=True)
 
 def create_app(config_name=None):
     """创建Flask应用"""
