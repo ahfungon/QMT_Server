@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from models import db, StockStrategy
-from ai_processor import AIStrategyProcessor
+from ai_processor import create_ai_processor
 import os
 from dotenv import load_dotenv
 import json
@@ -24,7 +24,10 @@ load_dotenv()
 app = Flask(__name__)
 
 # 配置数据库
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///stock_strategy.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
+    f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT')}/{os.getenv('MYSQL_DATABASE')}"
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.json.ensure_ascii = False  # 确保JSON响应中的中文正常显示
 
@@ -33,8 +36,8 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-# 创建AI处理器实例
-ai_processor = AIStrategyProcessor()
+# 创建AI处理器
+ai_processor = create_ai_processor()
 
 def log_request_info(request):
     """记录请求信息"""
