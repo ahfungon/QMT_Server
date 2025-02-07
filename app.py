@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify, render_template
-from models import db, StockStrategy
+from app.models import db, StockStrategy
 from ai_robot import create_ai_processor
 import os
-from dotenv import load_dotenv
 import json
 import logging
 from datetime import datetime
@@ -17,9 +16,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-# 加载环境变量
-load_dotenv()
 
 app = Flask(__name__)
 

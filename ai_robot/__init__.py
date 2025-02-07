@@ -22,7 +22,7 @@ def create_ai_processor() -> BaseAIProcessor:
     Returns:
         BaseAIProcessor: AI处理器实例
     """
-    ai_type = os.getenv('AI_TYPE', 'zhipu').lower()
+    ai_type = os.getenv('AI_TYPE', 'zhipu').lower().strip()
     logger.info("="*50)
     logger.info(f"正在初始化 AI 处理器...")
     logger.info(f"当前选择的 AI 模型: {ai_type}")
@@ -30,4 +30,8 @@ def create_ai_processor() -> BaseAIProcessor:
     
     if ai_type == 'deepseek':
         return DeepseekAIProcessor()
-    return ZhipuAIProcessor()  # 默认使用智谱AI 
+    elif ai_type == 'zhipu':
+        return ZhipuAIProcessor()
+    else:
+        logger.warning(f"未知的 AI 类型: {ai_type}，将使用默认的智谱AI")
+        return ZhipuAIProcessor() 

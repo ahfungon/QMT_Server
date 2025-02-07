@@ -1,85 +1,92 @@
-# 股票策略接口程序
+# QMT Server
 
-这是一个基于 Flask 的股票策略管理系统，提供 RESTful API 接口来管理股票交易策略。
+这是一个基于 Flask 的 API 接口服务，主要功能是根据传入的策略信息，进调用 AI 功能进行加工处理，并确立相应的股票交易策略，存入数据库。
 
-## 功能特点
+## 项目依赖
+- Python 3.10 及以上版本
+- Flask 框架
+- SQLAlchemy 进行数据库操作
+- Pytest 进行单元测试
+- Pytest-cov 进行测试覆盖率统计
+- Pytest-mock 进行测试模拟
 
-- 创建和管理股票交易策略
-- 支持买入/卖出操作
-- 灵活的价格区间设置
-- 支持止盈止损设置
-- JSON 格式的数据交互
-
-## 安装步骤
-
-1. 克隆项目到本地
-2. 安装依赖：
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. 配置数据库：
-   创建 .env 文件并设置以下环境变量：
-   ```
-   MYSQL_HOST=localhost
-   MYSQL_PORT=3306
-   MYSQL_USER=your_username
-   MYSQL_PASSWORD=your_password
-   MYSQL_DATABASE=stock_strategy
-   ```
-
-4. 运行程序：
-   ```bash
-   python app.py
-   ```
-
-## API 接口说明
-
-### 1. 创建策略
-- 端点：`POST /api/v1/strategies`
-- 请求体示例：
-```json
-{
-    "stock_name": "示例股票",
-    "stock_code": "000001",
-    "action": "buy",
-    "position_ratio": 0.3,
-    "price_min": 10.5,
-    "price_max": 11.0,
-    "take_profit_price": 12.0,
-    "stop_loss_price": 10.0,
-    "other_conditions": "MA5上穿MA10",
-    "reason": "技术面突破"
-}
+## 文件结构
+```
+QMT_Server/
+├── app/                    # 主应用目录
+│   ├── __init__.py        # 应用初始化
+│   ├── models/            # 数据模型
+│   ├── routes/            # 路由定义
+│   ├── templates/         # 模板文件
+│   ├── static/            # 静态文件
+│   └── utils/             # 工具函数
+├── ai_robot/              # AI 机器人模块
+│   ├── __init__.py        # AI 处理器工厂
+│   ├── base.py           # 基础 AI 处理器
+│   ├── zhipu.py          # 智谱 AI 实现
+│   └── deepseek.py       # DeepSeek AI 实现
+├── config/                # 配置文件目录
+│   ├── __init__.py       # 配置加载
+│   └── settings.py       # 配置定义
+├── docs/                  # 文档目录
+├── logs/                  # 日志目录
+├── scripts/               # 脚本目录
+├── tests/                 # 测试目录
+├── .env                   # 环境变量
+├── .env.example          # 环境变量示例
+├── .gitignore            # Git 忽略文件
+├── requirements.txt      # 项目依赖
+└── run.py                # 应用启动文件
 ```
 
-### 2. 更新策略
-- 端点：`PUT /api/v1/strategies/<strategy_id>`
-- 请求体格式同创建策略
+## 快速开始
 
-### 3. 获取策略
-- 获取所有策略：`GET /api/v1/strategies`
-- 获取特定股票策略：`GET /api/v1/strategies?stock_code=000001`
-- 查询参数：
-  - stock_code：股票代码（可选）
-  - is_active：是否有效（可选，默认为true）
+1. 克隆项目
+```bash
+git clone https://github.com/yourusername/QMT_Server.git
+cd QMT_Server
+```
 
-### 4. 删除策略
-- 端点：`DELETE /api/v1/strategies/<strategy_id>`
+2. 创建并激活虚拟环境
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# 或
+.venv\Scripts\activate     # Windows
+```
 
-## 数据库结构
+3. 安装依赖
+```bash
+pip install -r requirements.txt
+```
 
-主要数据表：stock_strategies
-- id：策略ID
-- stock_name：股票名称
-- stock_code：股票代码
-- action：操作类型（买入/卖出）
-- position_ratio：操作比例
-- price_min：最小执行价
-- price_max：最大执行价
-- take_profit_price：止盈价
-- stop_loss_price：止损价
-- other_conditions：其他条件
-- reason：操作理由
-- created_at：创建时间
-- updated_at：更新时间
-- is_active：是否有效 
+4. 配置环境变量
+```bash
+cp .env.example .env
+# 编辑 .env 文件，填入必要的配置信息
+```
+
+5. 运行应用
+```bash
+python run.py
+```
+
+## API 文档
+
+详细的 API 文档请参考 `docs/` 目录。
+
+## 测试
+
+运行测试：
+```bash
+pytest
+```
+
+生成测试覆盖率报告：
+```bash
+pytest --cov=app tests/
+```
+
+## 许可证
+
+[MIT](LICENSE) 

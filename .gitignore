@@ -17,6 +17,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -28,7 +29,6 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -52,3 +52,8 @@ log/
 *.sqlite3
 *.db
 *.db-journal
+
+# 其他
+.env.production
+.coverage
+htmlcov/

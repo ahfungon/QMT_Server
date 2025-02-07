@@ -10,6 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 import re
+from jsonschema import validate, ValidationError
 
 class BaseAIProcessor(ABC):
     """AI处理器基类"""
@@ -35,7 +36,7 @@ class BaseAIProcessor(ABC):
 
 {
     "stock_name": "股票名称（字符串）",
-    "stock_code": "股票代码（6位数字字符串）",
+    "stock_code": "股票代码（A股6位数字，港股4-5位数字）",
     "action": "buy或sell（字符串），如果不确定则填null",
     "position_ratio": 0.5,
     "price_min": 10.5,
@@ -54,14 +55,14 @@ class BaseAIProcessor(ABC):
                 "stock_name": {"type": "string"},
                 "stock_code": {
                     "type": "string",
-                    "pattern": "^\\d{6}$"
+                    "pattern": "^\\d{4,6}$"  # 修改为支持4-6位数字
                 },
                 "action": {
                     "type": ["string", "null"],
                     "enum": ["buy", "sell", None]
                 },
                 "position_ratio": {
-                    "type": "number",
+                    "type": ["number", "null"],
                     "minimum": 0,
                     "maximum": 1
                 },
@@ -77,7 +78,7 @@ class BaseAIProcessor(ABC):
                     "required": ["error"]
                 },
                 {
-                    "required": ["stock_name", "stock_code", "position_ratio"]
+                    "required": ["stock_name", "stock_code"]
                 }
             ],
             "additionalProperties": False
@@ -89,20 +90,17 @@ class BaseAIProcessor(ABC):
         pass
 
     def validate_json_schema(self, data: Dict[str, Any]) -> bool:
-        """验证 JSON 数据是否符合预定义的 Schema"""
+        """验证JSON数据是否符合预定义的模式"""
         try:
-            from jsonschema import validate, ValidationError
+            # 验证JSON Schema
             validate(instance=data, schema=self.schema)
-            self.logger.info("JSON Schema 验证通过")
             return True
-        except ImportError:
-            self.logger.error("jsonschema 模块未安装")
-            return False
+            
         except ValidationError as e:
-            self.logger.error(f"Schema验证失败: {str(e)}")
+            self.logger.error(f"Schema验证失败: {str(e)}\n\n{e.absolute_path}\n\nOn instance:\n{e.instance}")
             return False
         except Exception as e:
-            self.logger.error(f"Schema验证异常: {str(e)}")
+            self.logger.error(f"验证过程发生错误: {str(e)}")
             return False
 
     def process_strategy(self, user_input: str) -> Dict[str, Any]:

@@ -1,6 +1,12 @@
 # 项目介绍
 这是一个基于 Flask 的 API 接口服务，主要功能是根据传入的策略信息，进调用 AI 功能进行加工处理，并确立相应的股票交易策略，存入数据库。
 
+# 开发环境
+- Python 3.10+
+- MySQL 8.0+
+- Git
+- VSCode/PyCharm（推荐使用）
+
 # 项目依赖
 - 使用 Python 3.10 及以上版本
 - 使用 Flask 框架
@@ -14,18 +20,48 @@
 - 使用中文注释与描述
 - 使用中文错误信息
 - 使用中文日志
+- 每个函数必须有文档字符串，说明功能、参数和返回值
+- 代码行长度不超过 120 个字符
+- 类和函数之间空两行，方法之间空一行
+- 导入顺序：标准库 > 第三方库 > 本地模块，每组之间空一行
+- 使用 Type Hints 进行类型注解
+- 异常处理必须指明具体的异常类型，避免裸露的 except
 
 # 文件结构
 - app.py 是主文件，负责启动 Flask 应用
-- models.py 是数据库模型文件
-- test_app.py 是测试文件，测试接口是否正常
-- database.sql 是数据库表结构文件
+- app/ 目录包含主要应用代码
+  - __init__.py 负责应用初始化
+  - models/ 包含数据库模型
+  - routes/ 包含路由定义
+  - templates/ 包含模板文件
+  - static/ 包含静态文件
+  - utils/ 包含工具函数
+- ai_robot/ 目录包含 AI 机器人实现
+  - __init__.py 负责 AI 处理器工厂
+  - base.py 定义基础 AI 处理器
+  - zhipu.py 实现智谱 AI
+  - deepseek.py 实现 DeepSeek AI
+- config/ 目录包含配置文件
+  - __init__.py 负责配置加载
+  - settings.py 定义配置项
+  - development.py 开发环境配置
+  - production.py 生产环境配置
+- docs/ 包含项目文档
+  - API_DOCUMENT.md API文档
+  - DATABASE.md 数据库设计文档
+  - DEPLOYMENT.md 部署文档
+- logs/ 包含日志文件
+- scripts/ 包含脚本文件
+  - init_db.py 数据库初始化
+  - test_data.py 测试数据生成
+- tests/ 包含测试文件
+  - __init__.py
+  - conftest.py 测试配置
+  - test_*.py 测试文件
 - .env 是环境变量文件
-- .env.example 是环境变量文件示例
+- .env.example 是环境变量示例
 - requirements.txt 是项目依赖文件
-- README.md 是项目说明文件
-- /templates 是模板文件夹
-- /ai_robot 是 AI 机器人文件夹，后续会根据需要添加不同的大模型
+- run.py 是应用启动文件
 
 # 文档规范
 - 使用 JSDoc 格式编写函数和组件的注释
