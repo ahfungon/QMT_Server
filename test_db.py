@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import pymysql
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 # 加载环境变量
@@ -75,7 +75,7 @@ def test_sqlalchemy_connection():
         # 测试连接
         with engine.connect() as conn:
             print("SQLAlchemy 连接成功!")
-            result = conn.execute("SELECT VERSION()").fetchone()
+            result = conn.execute(text("SELECT VERSION()")).fetchone()
             print(f"MySQL 版本: {result[0]}")
             
     except SQLAlchemyError as e:
