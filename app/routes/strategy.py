@@ -8,6 +8,7 @@ import logging
 from flask import Blueprint, request, render_template, jsonify
 from ..services.strategy import StrategyService
 from ..utils.response import success_response, error_response
+from ..models import StockStrategy
 
 # 创建蓝图
 strategy_bp = Blueprint('strategy', __name__)
@@ -96,8 +97,23 @@ def get_strategies():
     try:
         log_request_info(request)
         
-        strategies = strategy_service.get_all_strategies()
-        response = success_response(strategies)
+        # 获取排序参数，默认按更新时间降序
+        sort_by = request.args.get('sort_by', 'updated_at')  # 可选值: updated_at, created_at
+        order = request.args.get('order', 'desc')  # 可选值: desc, asc
+        
+        # 构建查询
+        query = StockStrategy.query
+        
+        # 添加排序
+        if sort_by == 'created_at':
+            query = query.order_by(StockStrategy.created_at.desc() if order == 'desc' else StockStrategy.created_at.asc())
+        else:  # 默认按更新时间
+            query = query.order_by(StockStrategy.updated_at.desc() if order == 'desc' else StockStrategy.updated_at.asc())
+        
+        # 执行查询
+        strategies = query.all()
+        
+        response = success_response([strategy.to_dict() for strategy in strategies])
         log_response_info(response.get_json())
         return response
         

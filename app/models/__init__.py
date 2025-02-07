@@ -8,4 +8,8 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
-from .stock import StockStrategy 
+# 导入所有模型
+from .stock import StockStrategy
+
+# 导出所有模型
+__all__ = ['db', 'StockStrategy'] 

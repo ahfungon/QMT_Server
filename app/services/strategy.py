@@ -27,10 +27,27 @@ class StrategyService:
             logger.error(f"策略分析失败: {str(e)}", exc_info=True)
             raise
     
-    def get_all_strategies(self) -> List[Dict[str, Any]]:
-        """获取所有策略"""
+    def get_all_strategies(self, sort_by: str = 'updated_at', order: str = 'desc') -> List[Dict[str, Any]]:
+        """
+        获取所有策略
+        
+        Args:
+            sort_by: 排序字段，可选值: updated_at, created_at
+            order: 排序方式，可选值: desc, asc
+            
+        Returns:
+            List[Dict[str, Any]]: 策略列表
+        """
         try:
-            strategies = StockStrategy.query.all()
+            query = StockStrategy.query
+            
+            # 添加排序
+            if sort_by == 'created_at':
+                query = query.order_by(StockStrategy.created_at.desc() if order == 'desc' else StockStrategy.created_at.asc())
+            else:  # 默认按更新时间
+                query = query.order_by(StockStrategy.updated_at.desc() if order == 'desc' else StockStrategy.updated_at.asc())
+            
+            strategies = query.all()
             return [strategy.to_dict() for strategy in strategies]
         except Exception as e:
             logger.error(f"获取策略列表失败: {str(e)}", exc_info=True)

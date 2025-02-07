@@ -5,9 +5,10 @@ DeepSeek AI处理器模块
 """
 
 import os
-import requests
-import json
 from typing import Dict, Any
+import httpx
+from openai import OpenAI, APITimeoutError, APIError
+import json
 from .base import BaseAIProcessor
 
 class DeepseekAIProcessor(BaseAIProcessor):
@@ -17,7 +18,32 @@ class DeepseekAIProcessor(BaseAIProcessor):
         self.api_key = os.getenv('DEEPSEEK_API_KEY')
         if not self.api_key:
             raise ValueError("未找到DEEPSEEK_API_KEY环境变量")
-        self.api_url = "https://api.deepseek.com/v1/chat/completions"
+        
+        # 创建httpx客户端，设置较长的超时时间
+        timeout = httpx.Timeout(
+            timeout=120.0,  # 总超时时间
+            connect=30.0,   # 连接超时
+            read=90.0,      # 读取超时
+            write=30.0      # 写入超时
+        )
+        
+        transport = httpx.HTTPTransport(
+            retries=3,  # 传输层重试次数
+            verify=True # SSL验证
+        )
+        
+        http_client = httpx.Client(
+            timeout=timeout,
+            transport=transport,
+            follow_redirects=True
+        )
+        
+        # 初始化OpenAI客户端
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com/v1",
+            http_client=http_client
+        )
 
     def call_ai_api(self, user_input: str, retry_count: int = 0) -> Dict[str, Any]:
         """调用DeepSeek API并处理响应"""
@@ -41,22 +67,15 @@ class DeepseekAIProcessor(BaseAIProcessor):
                 
                 # 调用DeepSeek API
                 self.logger.info(f"调用DeepSeek AI (第 {current_retry + 1} 次尝试)")
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                data = {
-                    "model": "deepseek-chat",
-                    "messages": messages,
-                    "temperature": 0.1,
-                    "max_tokens": 2000
-                }
-                
-                response = requests.post(self.api_url, headers=headers, json=data)
-                response.raise_for_status()
+                response = self.client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=messages,
+                    stream=False,
+                    temperature=0.1  # 降低随机性
+                )
                 
                 # 获取返回的文本内容
-                content = response.json()['choices'][0]['message']['content'].strip()
+                content = response.choices[0].message.content.strip()
                 self.logger.info(f"AI响应原始内容:\n{content}")
                 
                 # 清理和验证JSON
@@ -69,6 +88,15 @@ class DeepseekAIProcessor(BaseAIProcessor):
                 # 如果验证失败，记录错误并继续重试
                 current_retry += 1
                 
+            except APITimeoutError as e:
+                self.logger.error(f"API 请求超时: {str(e)}")
+                current_retry += 1
+            except APIError as e:
+                self.logger.error(f"API 服务错误: {str(e)}")
+                current_retry += 1
+            except ValueError as e:
+                self.logger.error(f"数据验证错误: {str(e)}")
+                current_retry += 1
             except Exception as e:
                 self.logger.error(f"API 调用失败: {str(e)}")
                 current_retry += 1

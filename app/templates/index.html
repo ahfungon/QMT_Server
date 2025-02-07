@@ -3,406 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>股票策略管理系统</title>
-    <!-- Bootstrap CSS -->
+    <title>QMT Server - 股票交易策略管理</title>
+    <!-- 引入 Bootstrap CSS -->
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <!-- Vue.js -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
-    <!-- Axios -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.5.0/axios.min.js"></script>
+    <!-- 引入自定义样式 -->
     <style>
-        /* 自定义样式 */
-        .table-responsive {
-            overflow-x: auto;
+        .strategy-card {
+            margin-bottom: 1rem;
         }
-        .text-truncate {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .strategy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .btn-group {
-            white-space: nowrap;
+        .strategy-time {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .buy-action {
+            color: #d9534f;
+        }
+        .sell-action {
+            color: #5cb85c;
         }
     </style>
 </head>
 <body>
-    {% raw %}
-    <div id="app" class="container mt-4">
-        <h1 class="mb-4">股票策略管理系统</h1>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">股票交易策略管理</h1>
         
-        <!-- AI策略分析 -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">AI策略分析</h5>
-            </div>
-            <div class="card-body">
-                <form @submit.prevent="analyzeStrategy">
-                    <div class="mb-3">
-                        <label class="form-label">输入您的交易策略：</label>
-                        <textarea class="form-control" v-model="aiInput" rows="10" required
-                            placeholder="请输入详细的交易策略，包含：股票名称和代码、入场策略、止损策略、止盈策略、持股理由等..."></textarea>
+        <div class="row mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <button class="btn btn-primary me-2" onclick="refreshStrategies()">刷新列表</button>
+                        <select class="form-select d-inline-block w-auto" id="sortSelect" onchange="refreshStrategies()">
+                            <option value="updated_at">按更新时间</option>
+                            <option value="created_at">按创建时间</option>
+                        </select>
+                        <select class="form-select d-inline-block w-auto ms-2" id="orderSelect" onchange="refreshStrategies()">
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
                     </div>
-                    <div class="text-end">
-                        <button type="submit" class="btn btn-primary" :disabled="isAnalyzing">
-                            {{ isAnalyzing ? '分析中...' : 'AI分析' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- 策略列表 -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">策略列表</h5>
-                <button class="btn btn-primary" @click="showAddForm = true">新增策略</button>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <input type="text" class="form-control" v-model="searchCode" placeholder="输入股票代码搜索">
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>股票名称</th>
-                                <th>股票代码</th>
-                                <th>操作类型</th>
-                                <th>操作比例</th>
-                                <th>最小执行价</th>
-                                <th>最大执行价</th>
-                                <th>止盈价</th>
-                                <th>止损价</th>
-                                <th>其他条件</th>
-                                <th>操作理由</th>
-                                <th>创建时间</th>
-                                <th>更新时间</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="strategy in filteredStrategies" :key="strategy.id">
-                                <td>{{ strategy.id }}</td>
-                                <td>{{ strategy.stock_name }}</td>
-                                <td>{{ strategy.stock_code }}</td>
-                                <td>{{ strategy.action === 'buy' ? '买入' : '卖出' }}</td>
-                                <td>{{ strategy.position_ratio * 100 }}%</td>
-                                <td>{{ strategy.price_min || '-' }}</td>
-                                <td>{{ strategy.price_max || '-' }}</td>
-                                <td>{{ strategy.take_profit_price || '-' }}</td>
-                                <td>{{ strategy.stop_loss_price || '-' }}</td>
-                                <td>
-                                    <span class="text-truncate d-inline-block" style="max-width: 150px;" :title="strategy.other_conditions">
-                                        {{ strategy.other_conditions || '-' }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="text-truncate d-inline-block" style="max-width: 150px;" :title="strategy.reason">
-                                        {{ strategy.reason || '-' }}
-                                    </span>
-                                </td>
-                                <td>{{ formatDateTime(strategy.created_at) }}</td>
-                                <td>{{ formatDateTime(strategy.updated_at) }}</td>
-                                <td>
-                                    <span :class="['badge', strategy.is_active ? 'bg-success' : 'bg-danger']">
-                                        {{ strategy.is_active ? '有效' : '无效' }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group">
-                                        <button class="btn btn-sm btn-warning" @click="editStrategy(strategy)" title="编辑">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger ms-1" @click="deleteStrategy(strategy.id)" title="设为失效" :disabled="!strategy.is_active">
-                                            <i class="bi bi-x-circle"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="filteredStrategies.length === 0">
-                                <td colspan="15" class="text-center">暂无数据</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <button class="btn btn-success" onclick="showCreateStrategyModal()">新建策略</button>
                 </div>
             </div>
         </div>
 
-        <!-- 新增/编辑策略表单 -->
-        <div class="modal" tabindex="-1" :class="{ 'd-block': showAddForm }">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{{ currentStrategy.id ? '更新策略' : '新增策略' }}</h5>
-                        <button type="button" class="btn-close" @click="closeForm"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form @submit.prevent="saveStrategy">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">股票名称</label>
-                                    <input type="text" class="form-control" v-model="currentStrategy.stock_name" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">股票代码</label>
-                                    <input type="text" class="form-control" v-model="currentStrategy.stock_code" required>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">操作类型</label>
-                                    <select class="form-select" v-model="currentStrategy.action" required>
-                                        <option value="buy">买入</option>
-                                        <option value="sell">卖出</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">操作比例</label>
-                                    <input type="number" class="form-control" v-model="currentStrategy.position_ratio" step="0.1" min="0" max="1" required>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">最小执行价</label>
-                                    <input type="number" class="form-control" v-model="currentStrategy.price_min" step="0.01">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">最大执行价</label>
-                                    <input type="number" class="form-control" v-model="currentStrategy.price_max" step="0.01">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">止盈价</label>
-                                    <input type="number" class="form-control" v-model="currentStrategy.take_profit_price" step="0.01">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">止损价</label>
-                                    <input type="number" class="form-control" v-model="currentStrategy.stop_loss_price" step="0.01">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">其他条件</label>
-                                <textarea class="form-control" v-model="currentStrategy.other_conditions" rows="2"></textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">操作理由</label>
-                                <textarea class="form-control" v-model="currentStrategy.reason" rows="2"></textarea>
-                            </div>
-                            <div class="text-end">
-                                <button type="button" class="btn btn-secondary me-2" @click="closeForm">取消</button>
-                                <button type="submit" class="btn btn-primary">{{ currentStrategy.id ? '更新' : '新增' }}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+        <div id="strategiesList" class="row">
+            <!-- 策略列表将通过 JavaScript 动态加载 -->
         </div>
-        <div class="modal-backdrop fade show" v-if="showAddForm"></div>
     </div>
-    {% endraw %}
 
+    <!-- 新建策略模态框 -->
+    <div class="modal fade" id="createStrategyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新建策略</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createStrategyForm">
+                        <div class="mb-3">
+                            <label class="form-label">策略文本</label>
+                            <textarea class="form-control" id="strategyText" rows="3" required></textarea>
+                            <div class="form-text">请输入自然语言的策略描述，例如："以30元买入平安银行，仓位30%"</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-body" id="analysisResult" style="display: none;">
+                    <h6>策略解析结果：</h6>
+                    <pre id="analysisJson" class="bg-light p-3 rounded"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="analyzeStrategy()">分析策略</button>
+                    <button type="button" class="btn btn-success" onclick="createStrategy()" style="display: none;" id="createStrategyBtn">确认创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入必要的 JavaScript 库 -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    
+    <!-- 引入自定义脚本 -->
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
-
-        createApp({
-            setup() {
-                const strategies = ref([]);
-                const showAddForm = ref(false);
-                const searchCode = ref('');
-                const aiInput = ref('');
-                const isAnalyzing = ref(false);
-                const currentStrategy = ref({
-                    stock_name: '',
-                    stock_code: '',
-                    action: 'buy',
-                    position_ratio: 0.3,
-                    price_min: null,
-                    price_max: null,
-                    take_profit_price: null,
-                    stop_loss_price: null,
-                    other_conditions: '',
-                    reason: ''
-                });
-
-                // 过滤后的策略列表
-                const filteredStrategies = computed(() => {
-                    if (!searchCode.value) return strategies.value;
-                    return strategies.value.filter(strategy => 
-                        strategy.stock_code.toLowerCase().includes(searchCode.value.toLowerCase())
-                    );
-                });
-
-                // AI分析策略
-                const analyzeStrategy = async () => {
-                    if (!aiInput.value.trim()) {
-                        alert('请输入交易策略');
-                        return;
-                    }
-
-                    isAnalyzing.value = true;
-                    try {
-                        const response = await axios.post('/api/v1/analyze_strategy', {
-                            strategy_text: aiInput.value
-                        });
-                        
-                        // 检查是否返回错误信息
-                        if (response.data.data.error) {
-                            alert(response.data.data.error);
-                            aiInput.value = '';
-                            return;
-                        }
-                        
-                        // 先清空当前策略
-                        currentStrategy.value = {
-                            stock_name: '',
-                            stock_code: '',
-                            action: 'buy',
-                            position_ratio: 0.3,
-                            price_min: null,
-                            price_max: null,
-                            take_profit_price: null,
-                            stop_loss_price: null,
-                            other_conditions: '',
-                            reason: '',
-                            ...response.data.data
-                        };
-                        
-                        // 检查策略是否已存在
-                        const checkResponse = await axios.post('/api/v1/strategies/check', {
-                            stock_name: currentStrategy.value.stock_name,
-                            stock_code: currentStrategy.value.stock_code,
-                            action: currentStrategy.value.action
-                        });
-
-                        if (checkResponse.data.data) {
-                            // 如果策略已存在，使用已存在的策略数据
-                            currentStrategy.value = {
-                                ...checkResponse.data.data,
-                                ...response.data.data
-                            };
-                        }
-                        
-                        // 清空输入
-                        aiInput.value = '';
-                        
-                        // 显示编辑表单
-                        showAddForm.value = true;
-                        
-                    } catch (error) {
-                        alert('AI分析失败：' + (error.response?.data?.message || error.message));
-                    } finally {
-                        isAnalyzing.value = false;
-                    }
-                };
-
-                // 获取策略列表
-                const fetchStrategies = async () => {
-                    try {
-                        const response = await axios.get('/api/v1/strategies');
-                        strategies.value = response.data.data;
-                    } catch (error) {
-                        alert('获取策略列表失败：' + error.message);
-                    }
-                };
-
-                // 保存策略
-                const saveStrategy = async () => {
-                    try {
-                        if (currentStrategy.value.id) {
-                            // 更新已有策略
-                            await axios.post('/api/v1/strategies/update', currentStrategy.value);
-                        } else {
-                            // 创建新策略
-                            await axios.post('/api/v1/strategies', currentStrategy.value);
-                        }
-                        await fetchStrategies();
-                        closeForm();
-                    } catch (error) {
-                        alert('保存策略失败：' + (error.response?.data?.message || error.message));
-                    }
-                };
-
-                // 编辑策略
-                const editStrategy = (strategy) => {
-                    currentStrategy.value = { ...strategy };
-                    showAddForm.value = true;
-                };
-
-                // 删除策略
-                const deleteStrategy = async (id) => {
-                    if (confirm('确定要设置此策略为失效吗？')) {
-                        try {
-                            await axios.post(`/api/v1/strategies/${id}/deactivate`);
-                            await fetchStrategies();
-                        } catch (error) {
-                            alert('设置策略失效失败：' + (error.response?.data?.message || error.message));
-                        }
-                    }
-                };
-
-                // 关闭表单
-                const closeForm = () => {
-                    showAddForm.value = false;
-                    currentStrategy.value = {
-                        stock_name: '',
-                        stock_code: '',
-                        action: 'buy',
-                        position_ratio: 0.3,
-                        price_min: null,
-                        price_max: null,
-                        take_profit_price: null,
-                        stop_loss_price: null,
-                        other_conditions: '',
-                        reason: ''
-                    };
-                };
-
-                // 格式化时间的函数
-                const formatDateTime = (dateStr) => {
-                    if (!dateStr) return '-';
-                    const date = new Date(dateStr);
-                    
-                    // 检查是否为有效日期
-                    if (isNaN(date.getTime())) return '-';
-                    
-                    // 格式化为 YYYY-MM-DD HH:mm:ss
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    const hours = String(date.getHours()).padStart(2, '0');
-                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                    const seconds = String(date.getSeconds()).padStart(2, '0');
-                    
-                    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-                };
-
-                // 初始化
-                onMounted(() => {
-                    fetchStrategies();
-                });
-
-                return {
-                    strategies,
-                    filteredStrategies,
-                    showAddForm,
-                    currentStrategy,
-                    searchCode,
-                    aiInput,
-                    isAnalyzing,
-                    saveStrategy,
-                    editStrategy,
-                    deleteStrategy,
-                    closeForm,
-                    analyzeStrategy,
-                    formatDateTime
-                };
+        // 当前分析结果
+        let currentAnalysis = null;
+        
+        // 创建策略模态框实例
+        const createStrategyModal = new bootstrap.Modal(document.getElementById('createStrategyModal'));
+        
+        // 页面加载完成后获取策略列表
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStrategies();
+        });
+        
+        // 刷新策略列表
+        async function refreshStrategies() {
+            try {
+                const sortBy = document.getElementById('sortSelect').value;
+                const order = document.getElementById('orderSelect').value;
+                const response = await axios.get(`/api/v1/strategies?sort_by=${sortBy}&order=${order}`);
+                
+                if (response.data.code === 200) {
+                    displayStrategies(response.data.data);
+                } else {
+                    alert('获取策略列表失败：' + response.data.message);
+                }
+            } catch (error) {
+                console.error('获取策略列表失败：', error);
+                alert('获取策略列表失败，请查看控制台了解详情');
             }
-        }).mount('#app');
+        }
+        
+        // 显示策略列表
+        function displayStrategies(strategies) {
+            const container = document.getElementById('strategiesList');
+            container.innerHTML = '';
+            
+            strategies.forEach(strategy => {
+                const card = document.createElement('div');
+                card.className = 'col-md-6 col-lg-4 strategy-card';
+                card.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="strategy-header">
+                                <h5 class="card-title">${strategy.stock_name}（${strategy.stock_code}）</h5>
+                                <span class="${strategy.action === 'buy' ? 'buy-action' : 'sell-action'}">
+                                    ${strategy.action === 'buy' ? '买入' : '卖出'}
+                                </span>
+                            </div>
+                            <p class="card-text">
+                                仓位：${(strategy.position_ratio * 100).toFixed(0)}%<br>
+                                价格区间：${strategy.price_min} - ${strategy.price_max}<br>
+                                ${strategy.take_profit_price ? '止盈价：' + strategy.take_profit_price + '<br>' : ''}
+                                ${strategy.stop_loss_price ? '止损价：' + strategy.stop_loss_price + '<br>' : ''}
+                                ${strategy.other_conditions ? '其他条件：' + strategy.other_conditions + '<br>' : ''}
+                                ${strategy.reason ? '理由：' + strategy.reason : ''}
+                            </p>
+                            <div class="strategy-time">
+                                创建：${strategy.created_at}<br>
+                                更新：${strategy.updated_at}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // 显示创建策略模态框
+        function showCreateStrategyModal() {
+            document.getElementById('strategyText').value = '';
+            document.getElementById('analysisResult').style.display = 'none';
+            document.getElementById('createStrategyBtn').style.display = 'none';
+            document.getElementById('analysisJson').textContent = '';
+            currentAnalysis = null;
+            createStrategyModal.show();
+        }
+        
+        // 分析策略
+        async function analyzeStrategy() {
+            const strategyText = document.getElementById('strategyText').value.trim();
+            if (!strategyText) {
+                alert('请输入策略文本');
+                return;
+            }
+            
+            try {
+                const response = await axios.post('/api/v1/analyze_strategy', {
+                    strategy_text: strategyText
+                });
+                
+                if (response.data.code === 200) {
+                    currentAnalysis = response.data.data;
+                    document.getElementById('analysisJson').textContent = JSON.stringify(currentAnalysis, null, 2);
+                    document.getElementById('analysisResult').style.display = 'block';
+                    document.getElementById('createStrategyBtn').style.display = 'inline-block';
+                } else {
+                    alert('策略分析失败：' + response.data.message);
+                }
+            } catch (error) {
+                console.error('策略分析失败：', error);
+                alert('策略分析失败，请查看控制台了解详情');
+            }
+        }
+        
+        // 创建策略
+        async function createStrategy() {
+            if (!currentAnalysis) {
+                alert('请先分析策略');
+                return;
+            }
+            
+            try {
+                const response = await axios.post('/api/v1/strategies', currentAnalysis);
+                
+                if (response.data.code === 200) {
+                    createStrategyModal.hide();
+                    refreshStrategies();
+                    alert('策略创建成功');
+                } else {
+                    alert('策略创建失败：' + response.data.message);
+                }
+            } catch (error) {
+                console.error('策略创建失败：', error);
+                alert('策略创建失败，请查看控制台了解详情');
+            }
+        }
     </script>
 </body>
 </html> 
