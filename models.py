@@ -1,8 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from typing import Dict, Any
+import pytz
 
 db = SQLAlchemy()
+
+# 设置中国时区
+CN_TIMEZONE = pytz.timezone('Asia/Shanghai')
 
 class StockStrategy(db.Model):
     """股票策略模型"""
@@ -23,8 +27,8 @@ class StockStrategy(db.Model):
     other_conditions = db.Column(db.Text, nullable=True, comment='其他操作条件')
     reason = db.Column(db.Text, nullable=True, comment='操作理由')
     
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, comment='策略制定时间')
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow, comment='策略修正时间')
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), comment='策略制定时间')
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), onupdate=lambda: datetime.now(CN_TIMEZONE), comment='策略修正时间')
     is_active = db.Column(db.Boolean, nullable=False, default=True, comment='策略是否有效')
 
     def to_dict(self) -> Dict[str, Any]:
@@ -41,7 +45,7 @@ class StockStrategy(db.Model):
             'stop_loss_price': self.stop_loss_price,
             'other_conditions': self.other_conditions,
             'reason': self.reason,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
+            'created_at': self.created_at.astimezone(CN_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.astimezone(CN_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'),
             'is_active': self.is_active
         } 
