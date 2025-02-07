@@ -15,11 +15,18 @@ CN_TIMEZONE = pytz.timezone('Asia/Shanghai')
 class StockStrategy(db.Model):
     """股票策略模型"""
     __tablename__ = 'stock_strategies'
+    
+    # 设置表的字符集和排序规则
+    __table_args__ = {
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8mb4',
+        'mysql_collate': 'utf8mb4_unicode_ci'
+    }
 
     id = db.Column(db.Integer, primary_key=True)
-    stock_name = db.Column(db.String(100), nullable=False, comment='股票名称')
-    stock_code = db.Column(db.String(20), nullable=False, comment='股票代码')
-    action = db.Column(db.Enum('buy', 'sell'), nullable=False, comment='执行动作')
+    stock_name = db.Column(db.String(100, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票名称')
+    stock_code = db.Column(db.String(20, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票代码')
+    action = db.Column(db.Enum('buy', 'sell', name='action_types'), nullable=False, comment='执行动作')
     position_ratio = db.Column(db.Float, nullable=False, comment='操作比例')
     
     # 执行价位区间
@@ -28,8 +35,8 @@ class StockStrategy(db.Model):
     
     take_profit_price = db.Column(db.Float, nullable=True, comment='止盈价')
     stop_loss_price = db.Column(db.Float, nullable=True, comment='止损价')
-    other_conditions = db.Column(db.Text, nullable=True, comment='其他操作条件')
-    reason = db.Column(db.Text, nullable=True, comment='操作理由')
+    other_conditions = db.Column(db.Text(collation='utf8mb4_unicode_ci'), nullable=True, comment='其他操作条件')
+    reason = db.Column(db.Text(collation='utf8mb4_unicode_ci'), nullable=True, comment='操作理由')
     
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), comment='策略制定时间')
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), onupdate=lambda: datetime.now(CN_TIMEZONE), comment='策略修正时间')

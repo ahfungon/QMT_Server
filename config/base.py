@@ -17,8 +17,20 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
         f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/"
-        f"{os.getenv('MYSQL_DATABASE')}"
+        f"{os.getenv('MYSQL_DATABASE')}?charset=utf8mb4"
     )
+    
+    # 数据库连接池配置
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_timeout': 30,
+        'pool_recycle': 1800,  # 30分钟回收连接
+        'connect_args': {
+            'charset': 'utf8mb4',
+            'connect_timeout': 30,
+        }
+    }
     
     # 日志配置
     LOG_LEVEL = 'INFO'
