@@ -239,6 +239,21 @@ class BaseAIProcessor(ABC):
         
         try:
             result = json.loads(content)
+            
+            # 如果是有效的策略数据（不是错误信息）
+            if 'error' not in result:
+                # 只有在缺少股票代码或名称其中之一时，才调用新浪接口查询
+                if bool(result.get('stock_code')) != bool(result.get('stock_name')):
+                    # 使用已有的信息查询
+                    search_key = result.get('stock_code') or result.get('stock_name')
+                    stock_info = self.get_stock_info(search_key)
+                    if stock_info:
+                        result['stock_code'] = stock_info[0]  # 标准化的股票代码
+                        result['stock_name'] = stock_info[1]  # 股票名称
+                        self.logger.info(f"自动补充股票信息: {stock_info}")
+                    else:
+                        self.logger.warning(f"未找到股票信息: {search_key}")
+            
             self.logger.info(f"JSON解析成功:\n{json.dumps(result, ensure_ascii=False, indent=2)}")
             return result
         except json.JSONDecodeError as e:

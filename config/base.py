@@ -11,6 +11,20 @@ class BaseConfig:
     """基础配置类"""
     # Flask配置
     JSON_AS_ASCII = False
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev')  # 添加密钥
+    
+    # 安全配置
+    SESSION_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
+    
+    # CORS配置
+    CORS_ALLOW_ORIGINS = ['http://localhost:5000']
+    CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    CORS_ALLOW_HEADERS = ['Content-Type']
+    
+    # 模板配置
+    TEMPLATES_AUTO_RELOAD = True
     
     # 数据库配置
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -35,7 +49,7 @@ class BaseConfig:
     # 日志配置
     LOG_LEVEL = 'INFO'
     LOG_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
-    LOG_FILE = 'api.log'
+    LOG_FILE = 'app.log'
     
     # 时区配置
     TIMEZONE = 'Asia/Shanghai'

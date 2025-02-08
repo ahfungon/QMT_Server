@@ -8,6 +8,7 @@ import logging
 from flask import Blueprint, request, render_template, jsonify
 from ..services.strategy import StrategyService
 from ..utils.response import success_response, error_response
+from ..utils.decorators import handle_exceptions
 from ..models import StockStrategy
 
 # 创建蓝图
@@ -92,6 +93,7 @@ def analyze_strategy():
         return jsonify(error_response), 500
 
 @strategy_bp.route('/strategies', methods=['GET'])
+@handle_exceptions
 def get_strategies():
     """获取策略列表"""
     try:
@@ -101,26 +103,40 @@ def get_strategies():
         sort_by = request.args.get('sort_by', 'updated_at')  # 可选值: updated_at, created_at
         order = request.args.get('order', 'desc')  # 可选值: desc, asc
         
-        # 构建查询
-        query = StockStrategy.query
+        # 获取策略列表
+        strategies = strategy_service.get_all_strategies(sort_by, order)
         
-        # 添加排序
-        if sort_by == 'created_at':
-            query = query.order_by(StockStrategy.created_at.desc() if order == 'desc' else StockStrategy.created_at.asc())
-        else:  # 默认按更新时间
-            query = query.order_by(StockStrategy.updated_at.desc() if order == 'desc' else StockStrategy.updated_at.asc())
+        # 记录详细日志
+        logger.info("获取所有策略列表（排序规则：1.是否有效 2.更新时间 3.创建时间）:")
+        logger.info("-"*50)
+        for strategy in strategies:
+            logger.info(
+                f"ID: {strategy['id']:3d} | "
+                f"名称: {strategy['stock_name']:10s} | "
+                f"代码: {strategy['stock_code']:6s} | "
+                f"是否有效: {'是' if strategy['is_active'] else '否'} | "
+                f"创建时间: {strategy['created_at']} | "
+                f"更新时间: {strategy['updated_at']}"
+            )
+        logger.info("-"*50)
+        logger.info(f"共获取到 {len(strategies)} 条记录")
+        logger.info("="*50)
         
-        # 执行查询
-        strategies = query.all()
-        
-        response = success_response([strategy.to_dict() for strategy in strategies])
-        log_response_info(response.get_json())
-        return response
+        response_data = {
+            'code': 200,
+            'message': 'success',
+            'data': strategies
+        }
+        return jsonify(response_data)
         
     except Exception as e:
-        response = error_response(str(e))
-        log_response_info(response.get_json())
-        return response
+        error_data = {
+            'code': 500,
+            'message': str(e),
+            'data': None
+        }
+        logger.error(f"获取策略列表失败: {str(e)}", exc_info=True)
+        return jsonify(error_data), 500
 
 @strategy_bp.route('/strategies', methods=['POST'])
 def create_strategy():
@@ -146,15 +162,42 @@ def update_strategy(id):
         log_request_info(request)
         
         data = request.get_json()
+        if not data:
+            response_data = {
+                'code': 400,
+                'message': '请求数据为空',
+                'data': None
+            }
+            log_response_info(response_data)
+            return jsonify(response_data), 400
+            
         strategy = strategy_service.update_strategy(id, data)
-        response = success_response(strategy)
-        log_response_info(response.get_json())
-        return response
+        response_data = {
+            'code': 200,
+            'message': '策略更新成功',
+            'data': strategy
+        }
+        log_response_info(response_data)
+        return jsonify(response_data)
+        
+    except ValueError as e:
+        response_data = {
+            'code': 400,
+            'message': str(e),
+            'data': None
+        }
+        log_response_info(response_data)
+        return jsonify(response_data), 400
         
     except Exception as e:
-        response = error_response(str(e))
-        log_response_info(response.get_json())
-        return response
+        response_data = {
+            'code': 500,
+            'message': f'更新策略失败: {str(e)}',
+            'data': None
+        }
+        logger.error(f"更新策略失败: {str(e)}", exc_info=True)
+        log_response_info(response_data)
+        return jsonify(response_data), 500
 
 @strategy_bp.route('/strategies/check', methods=['POST'])
 def check_strategy():
@@ -219,4 +262,45 @@ def deactivate_strategy(id):
     except Exception as e:
         response = error_response(f'设置策略失效失败: {str(e)}', 500)
         log_response_info(response.get_json())
-        return response 
+        return response
+
+@strategy_bp.route('/strategies/search', methods=['GET'])
+def search_strategies():
+    """高级查询策略列表"""
+    try:
+        log_request_info(request)
+        
+        # 获取查询参数
+        params = {
+            'start_time': request.args.get('start_time'),
+            'end_time': request.args.get('end_time'),
+            'stock_code': request.args.get('stock_code'),
+            'stock_name': request.args.get('stock_name'),
+            'action': request.args.get('action'),
+            'sort_by': request.args.get('sort_by', 'updated_at'),
+            'order': request.args.get('order', 'desc'),
+            'is_active': None if request.args.get('is_active') is None else request.args.get('is_active').lower() == 'true'
+        }
+        
+        # 调用服务层方法
+        strategies = strategy_service.search_strategies(**params)
+        
+        response = success_response(strategies)
+        log_response_info(response.get_json())
+        return response
+        
+    except Exception as e:
+        response = error_response(f'查询策略列表失败: {str(e)}', 500)
+        log_response_info(response.get_json())
+        return response
+
+@strategy_bp.route('/strategies/<int:id>', methods=['GET'])
+@handle_exceptions
+def get_strategy(id):
+    """获取单个策略"""
+    try:
+        strategy = StockStrategy.query.get_or_404(id)
+        return success_response(strategy.to_dict())
+    except Exception as e:
+        logger.error(f"获取策略失败: {str(e)}", exc_info=True)
+        return error_response("获取策略失败", code=500) 
