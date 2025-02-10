@@ -190,6 +190,18 @@ class StrategyService:
             logger.error(f"设置策略失效失败: {str(e)}", exc_info=True)
             raise
     
+    def activate_strategy(self, strategy_id: int) -> Dict[str, Any]:
+        """设置策略为有效"""
+        try:
+            strategy = StockStrategy.query.get_or_404(strategy_id)
+            strategy.is_active = True
+            db.session.commit()
+            return strategy.to_dict()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"设置策略有效失败: {str(e)}", exc_info=True)
+            raise
+    
     def search_strategies(self, 
         start_time: str = None, 
         end_time: str = None, 

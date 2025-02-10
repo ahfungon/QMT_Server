@@ -145,6 +145,13 @@ def create_strategy():
         log_request_info(request)
         
         data = request.get_json()
+        
+        # 验证必要字段
+        if not data.get('action'):
+            response = error_response('交易动作不能为空', 400)
+            log_response_info(response.get_json())
+            return response
+            
         strategy = strategy_service.create_strategy(data)
         response = success_response(strategy)
         log_response_info(response.get_json())
@@ -261,6 +268,22 @@ def deactivate_strategy(id):
         
     except Exception as e:
         response = error_response(f'设置策略失效失败: {str(e)}', 500)
+        log_response_info(response.get_json())
+        return response
+
+@strategy_bp.route('/strategies/<int:id>/activate', methods=['POST'])
+def activate_strategy(id):
+    """设置策略为有效"""
+    try:
+        log_request_info(request)
+        
+        strategy = strategy_service.activate_strategy(id)
+        response = success_response(strategy, '策略已设置为有效')
+        log_response_info(response.get_json())
+        return response
+        
+    except Exception as e:
+        response = error_response(f'设置策略有效失败: {str(e)}', 500)
         log_response_info(response.get_json())
         return response
 

@@ -478,7 +478,9 @@
                                             <i class="bi bi-x-lg"></i> 失效
                                         </button>
                                     ` : `
-                                        <span class="badge bg-secondary">已失效</span>
+                                        <button class="btn btn-sm btn-outline-success" onclick="activateStrategy(${strategy.id})">
+                                            <i class="bi bi-check-lg"></i> 激活
+                                        </button>
                                     `}
                                 </div>
                             </div>
@@ -888,6 +890,27 @@
             } catch (error) {
                 console.error('设置策略失效失败：', error);
                 showToast('设置策略失效失败，请查看控制台了解详情', 'danger');
+            }
+        }
+
+        // 激活策略
+        async function activateStrategy(strategyId) {
+            if (!confirm('确定要激活此策略吗？')) {
+                return;
+            }
+
+            try {
+                const response = await axios.post(`/api/v1/strategies/${strategyId}/activate`);
+                
+                if (response.data.code === 200) {
+                    refreshStrategies();
+                    showToast('success', '策略已激活');
+                } else {
+                    showToast('error', response.data.message || '激活策略失败');
+                }
+            } catch (error) {
+                console.error('激活策略失败：', error);
+                showToast('error', '激活策略失败，请查看控制台了解详情');
             }
         }
 

@@ -2,7 +2,9 @@
 
 ## 基础信息
 
-- 基础URL: `http://localhost:5000/api/v1`
+- 基础URL: 
+  - `http://localhost:5000/api/v1`
+  - `http://127.0.0.1:5000/api/v1`
 - 所有响应格式均为 JSON
 - 时间格式: `YYYY-MM-DD HH:mm:ss`
 
@@ -28,7 +30,7 @@
 ### 1. 策略分析
 
 #### 请求信息
-- 路径: `/analyze_strategy`
+- 路径: `/api/v1/analyze_strategy`
 - 方法: POST
 - Content-Type: application/json
 
@@ -62,7 +64,7 @@
 ### 2. 获取策略列表
 
 #### 请求信息
-- 路径: `/strategies`
+- 路径: `/api/v1/strategies`
 - 方法: GET
 
 #### 查询参数
@@ -98,7 +100,7 @@
 ### 3. 创建策略
 
 #### 请求信息
-- 路径: `/strategies`
+- 路径: `/api/v1/strategies`
 - 方法: POST
 - Content-Type: application/json
 
@@ -145,7 +147,7 @@
 ### 4. 更新策略
 
 #### 请求信息
-- 路径: `/strategies/{id}`
+- 路径: `/api/v1/strategies/{id}`
 - 方法: PUT
 - Content-Type: application/json
 
@@ -189,7 +191,7 @@
 ### 5. 检查策略是否存在
 
 #### 请求信息
-- 路径: `/strategies/check`
+- 路径: `/api/v1/strategies/check`
 - 方法: POST
 - Content-Type: application/json
 
@@ -229,7 +231,7 @@
 ### 6. 根据关键字段更新策略
 
 #### 请求信息
-- 路径: `/strategies/update`
+- 路径: `/api/v1/strategies/update`
 - 方法: POST
 - Content-Type: application/json
 
@@ -276,7 +278,7 @@
 ### 7. 设置策略为失效
 
 #### 请求信息
-- 路径: `/strategies/{id}/deactivate`
+- 路径: `/api/v1/strategies/{id}/deactivate`
 - 方法: POST
 
 #### 响应示例
@@ -306,7 +308,7 @@
 ### 8. 高级查询策略列表
 
 #### 请求信息
-- 路径: `/strategies/search`
+- 路径: `/api/v1/strategies/search`
 - 方法: GET
 
 #### 查询参数
@@ -320,7 +322,7 @@
 
 #### 请求示例
 ```
-GET /strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&end_time=2024-02-07 23:59:59&sort_by=created_at&order=desc
+GET /api/v1/strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&end_time=2024-02-07 23:59:59&sort_by=created_at&order=desc
 ```
 
 #### 响应示例
@@ -346,5 +348,205 @@ GET /strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&end_time
             "updated_at": "2024-02-01 13:00:00"
         }
     ]
+}
+```
+
+### 9. 创建执行记录
+
+#### 请求信息
+- 路径: `/api/v1/executions`
+- 方法: POST
+- Content-Type: application/json
+
+#### 请求参数
+```json
+{
+    "strategy_id": 1,
+    "execution_price": 1550.5,
+    "volume": 100,
+    "remarks": "按计划执行"
+}
+```
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "创建执行记录成功",
+    "data": {
+        "id": 1,
+        "strategy_id": 1,
+        "stock_name": "贵州茅台",
+        "stock_code": "600519",
+        "action": "buy",
+        "execution_price": 1550.5,
+        "volume": 100,
+        "execution_time": "2024-02-08 13:30:00",
+        "execution_result": "success",
+        "remarks": "按计划执行",
+        "created_at": "2024-02-08 13:30:00",
+        "updated_at": "2024-02-08 13:30:00"
+    }
+}
+```
+
+### 10. 获取执行记录列表
+
+#### 请求信息
+- 路径: `/api/v1/executions`
+- 方法: GET
+
+#### 查询参数
+- `strategy_id`: 策略ID（可选）
+- `stock_code`: 股票代码（可选，支持模糊查询）
+- `start_time`: 开始时间（可选，格式：YYYY-MM-DD HH:mm:ss）
+- `end_time`: 结束时间（可选，格式：YYYY-MM-DD HH:mm:ss）
+- `action`: 交易动作（可选，buy/sell）
+- `result`: 执行结果（可选，success/failed/partial）
+- `sort_by`: 排序字段（可选，默认 execution_time）
+- `order`: 排序方式（可选，desc/asc，默认 desc）
+- `limit`: 返回记录数限制（可选）
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": [
+        {
+            "id": 1,
+            "strategy_id": 1,
+            "stock_name": "贵州茅台",
+            "stock_code": "600519",
+            "action": "buy",
+            "execution_price": 1550.5,
+            "volume": 100,
+            "execution_time": "2024-02-08 13:30:00",
+            "execution_result": "success",
+            "remarks": "按计划执行",
+            "created_at": "2024-02-08 13:30:00",
+            "updated_at": "2024-02-08 13:30:00"
+        }
+    ]
+}
+```
+
+### 11. 获取单个执行记录
+
+#### 请求信息
+- 路径: `/api/v1/executions/{execution_id}`
+- 方法: GET
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "id": 1,
+        "strategy_id": 1,
+        "stock_name": "贵州茅台",
+        "stock_code": "600519",
+        "action": "buy",
+        "execution_price": 1550.5,
+        "volume": 100,
+        "execution_time": "2024-02-08 13:30:00",
+        "execution_result": "success",
+        "remarks": "按计划执行",
+        "created_at": "2024-02-08 13:30:00",
+        "updated_at": "2024-02-08 13:30:00"
+    }
+}
+```
+
+### 12. 更新执行记录
+
+#### 请求信息
+- 路径: `/api/v1/executions/{execution_id}`
+- 方法: PUT
+- Content-Type: application/json
+
+#### 请求参数
+```json
+{
+    "execution_price": 1560.5,
+    "volume": 150,
+    "execution_result": "partial",
+    "remarks": "部分成交"
+}
+```
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "更新执行记录成功",
+    "data": {
+        "id": 1,
+        "strategy_id": 1,
+        "stock_name": "贵州茅台",
+        "stock_code": "600519",
+        "action": "buy",
+        "execution_price": 1560.5,
+        "volume": 150,
+        "execution_time": "2024-02-08 13:30:00",
+        "execution_result": "partial",
+        "remarks": "部分成交",
+        "created_at": "2024-02-08 13:30:00",
+        "updated_at": "2024-02-08 13:35:00"
+    }
+}
+```
+
+### 13. 删除执行记录
+
+#### 请求信息
+- 路径: `/api/v1/executions/{execution_id}`
+- 方法: DELETE
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "删除执行记录成功",
+    "data": null
+}
+```
+
+### 14. 批量获取执行记录
+
+#### 请求信息
+- 路径: `/api/v1/executions/batch`
+- 方法: POST
+- Content-Type: application/json
+
+#### 请求参数
+```json
+{
+    "strategy_ids": [1, 2, 3],
+    "limit": 3
+}
+```
+
+#### 响应示例
+```json
+{
+    "code": 200,
+    "message": "获取成功",
+    "data": {
+        "1": [
+            {
+                "execution_id": 1,
+                "strategy_id": 1,
+                "execution_time": "2024-02-08 13:30:00",
+                "execution_price": 1550.5,
+                "volume": 100,
+                "execution_result": "success",
+                "created_at": "2024-02-08 13:30:00"
+            }
+        ],
+        "2": [],
+        "3": []
+    }
 }
 ``` 
