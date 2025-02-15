@@ -13,6 +13,8 @@ from .models import db
 from .utils.logger import setup_logger
 from flask_cors import CORS
 from datetime import timedelta
+import logging
+from sqlalchemy import text
 
 # 加载环境变量（确保最先加载）
 env_path = Path(__file__).parent.parent / '.env'
@@ -56,7 +58,44 @@ def create_app(config_name=None):
     
     # 创建数据库表
     with app.app_context():
-        db.create_all()
+        try:
+            # 尝试创建数据库（如果不存在）
+            engine = db.get_engine()
+            database_name = os.getenv('MYSQL_DATABASE')
+            
+            # 创建到 MySQL 服务器的连接（不指定数据库）
+            base_url = (
+                f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
+                f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/"
+            )
+            engine_without_db = db.create_engine(base_url)
+            
+            # 检查数据库是否存在
+            with engine_without_db.connect() as conn:
+                result = conn.execute(text(
+                    f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{database_name}'"
+                ))
+                database_exists = result.scalar() is not None
+                
+                # 只有在数据库不存在时才创建
+                if not database_exists:
+                    logging.info(f"数据库 {database_name} 不存在，正在创建...")
+                    conn.execute(text(f"CREATE DATABASE {database_name} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                    conn.commit()
+                    logging.info(f"数据库 {database_name} 创建成功！")
+                else:
+                    logging.info(f"数据库 {database_name} 已存在，跳过创建步骤。")
+            
+            # 关闭不带数据库的连接
+            engine_without_db.dispose()
+            
+            # 创建或更新表结构
+            db.create_all()
+            logging.info("数据库表结构检查/更新完成！")
+            
+        except Exception as e:
+            logging.error(f"数据库初始化失败: {str(e)}")
+            raise
     
     # 注册蓝图
     from .routes import strategy_bp, execution_bp, home_bp

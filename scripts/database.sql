@@ -17,13 +17,15 @@ CREATE TABLE IF NOT EXISTS stock_strategies (
     stop_loss_price FLOAT NULL COMMENT '止损价',
     other_conditions TEXT NULL COMMENT '其他操作条件',
     reason TEXT NULL COMMENT '操作理由',
+    execution_status ENUM('pending', 'completed', 'partial') NOT NULL DEFAULT 'pending' COMMENT '执行状态：未执行、已全部执行、已部分执行',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '策略制定时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '策略修正时间',
     is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '策略是否有效',
     INDEX idx_stock_code (stock_code),
     INDEX idx_created_at (created_at),
     INDEX idx_updated_at (updated_at),
-    INDEX idx_is_active (is_active)
+    INDEX idx_is_active (is_active),
+    INDEX idx_execution_status (execution_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票策略表';
 
 -- 创建策略执行记录表

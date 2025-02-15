@@ -21,17 +21,26 @@ class ExecutionService:
         创建策略执行记录
         
         Args:
-            data: 执行记录数据
+            data: 执行记录数据，包含以下字段：
+                - strategy_id: 策略ID
+                - execution_price: 执行价格
+                - volume: 交易量
+                - strategy_status: 策略执行状态（'partial' 或 'completed'）
+                - remarks: 备注说明（可选）
             
         Returns:
             Dict[str, Any]: 创建的执行记录
         """
         try:
             # 验证必要字段
-            required_fields = ['strategy_id', 'execution_price', 'volume']
+            required_fields = ['strategy_id', 'execution_price', 'volume', 'strategy_status']
             for field in required_fields:
                 if field not in data or data[field] is None:
                     raise ValueError(f"缺少必要字段: {field}")
+            
+            # 验证策略状态参数
+            if data['strategy_status'] not in ['partial', 'completed']:
+                raise ValueError("策略状态必须是 'partial' 或 'completed'")
             
             # 验证策略ID并获取策略信息
             strategy = StockStrategy.query.get(data['strategy_id'])
@@ -39,23 +48,26 @@ class ExecutionService:
                 raise ValueError(f"策略ID {data['strategy_id']} 不存在")
             
             # 自动填充策略相关信息
-            data['stock_code'] = strategy.stock_code
-            data['stock_name'] = strategy.stock_name
-            data['action'] = strategy.action
-            
-            # 设置默认的执行结果
-            if 'execution_result' not in data or data['execution_result'] is None:
-                data['execution_result'] = 'success'
-            
-            # 设置执行时间
-            if 'execution_time' not in data:
-                data['execution_time'] = datetime.now()
+            execution_data = {
+                'strategy_id': data['strategy_id'],
+                'stock_code': strategy.stock_code,
+                'stock_name': strategy.stock_name,
+                'action': strategy.action,
+                'execution_price': data['execution_price'],
+                'volume': data['volume'],
+                'execution_result': 'success',  # 默认执行成功
+                'remarks': data.get('remarks', '')
+            }
             
             # 创建执行记录
-            execution = StrategyExecution(**data)
+            execution = StrategyExecution(**execution_data)
             db.session.add(execution)
-            db.session.commit()
             
+            # 更新策略执行状态
+            strategy.execution_status = data['strategy_status']
+            logger.info(f"策略 {strategy.id} 状态更新为: {data['strategy_status']}")
+            
+            db.session.commit()
             return execution.to_dict()
         except Exception as e:
             db.session.rollback()
@@ -166,6 +178,30 @@ class ExecutionService:
                 if hasattr(execution, key):
                     setattr(execution, key, value)
             
+            # 如果更新了执行量，需要重新计算策略执行状态
+            if 'volume' in data:
+                strategy = StockStrategy.query.get(execution.strategy_id)
+                if strategy:
+                    # 获取该策略的所有执行记录
+                    all_executions = StrategyExecution.query.filter_by(
+                        strategy_id=strategy.id
+                    ).all()
+                    
+                    # 计算已执行的总量
+                    total_executed_volume = sum(e.volume for e in all_executions)
+                    
+                    # 计算策略需要执行的总量
+                    # 这里需要根据实际业务逻辑调整计算方式
+                    target_volume = 100  # 这里需要根据实际业务逻辑计算目标数量
+                    
+                    # 更新策略状态
+                    if total_executed_volume >= target_volume:
+                        strategy.execution_status = 'completed'
+                        logger.info(f"策略 {strategy.id} 已全部执行完成")
+                    else:
+                        strategy.execution_status = 'partial'
+                        logger.info(f"策略 {strategy.id} 部分执行，已执行量: {total_executed_volume}")
+            
             db.session.commit()
             return execution.to_dict()
         except Exception as e:
@@ -185,7 +221,37 @@ class ExecutionService:
         """
         try:
             execution = StrategyExecution.query.get_or_404(execution_id)
-            db.session.delete(execution)
+            
+            # 获取策略信息
+            strategy = StockStrategy.query.get(execution.strategy_id)
+            if strategy:
+                # 删除当前执行记录后重新计算策略执行状态
+                db.session.delete(execution)
+                db.session.flush()  # 刷新会话，使删除生效但不提交
+                
+                # 获取剩余的执行记录
+                remaining_executions = StrategyExecution.query.filter_by(
+                    strategy_id=strategy.id
+                ).all()
+                
+                # 计算剩余执行量
+                total_executed_volume = sum(e.volume for e in remaining_executions)
+                
+                # 计算策略需要执行的总量
+                # 这里需要根据实际业务逻辑调整计算方式
+                target_volume = 100  # 这里需要根据实际业务逻辑计算目标数量
+                
+                # 更新策略状态
+                if not remaining_executions:
+                    strategy.execution_status = 'pending'
+                    logger.info(f"策略 {strategy.id} 所有执行记录已删除，状态更新为未执行")
+                elif total_executed_volume >= target_volume:
+                    strategy.execution_status = 'completed'
+                    logger.info(f"策略 {strategy.id} 删除执行记录后仍然全部执行完成")
+                else:
+                    strategy.execution_status = 'partial'
+                    logger.info(f"策略 {strategy.id} 删除执行记录后部分执行，剩余执行量: {total_executed_volume}")
+            
             db.session.commit()
             return True
         except Exception as e:

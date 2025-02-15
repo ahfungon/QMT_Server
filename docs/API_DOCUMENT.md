@@ -56,7 +56,8 @@
         "take_profit_price": 1700,
         "stop_loss_price": 1450,
         "other_conditions": "日线MACD金叉",
-        "reason": "技术面向好，估值合理"
+        "reason": "技术面向好，估值合理",
+        "execution_status": "pending"
     }
 }
 ```
@@ -89,6 +90,7 @@
             "stop_loss_price": 1450,
             "other_conditions": "日线MACD金叉",
             "reason": "技术面向好，估值合理",
+            "execution_status": "pending",
             "is_active": true,
             "created_at": "2024-02-01 10:00:00",
             "updated_at": "2024-02-01 10:00:00"
@@ -137,6 +139,7 @@
         "stop_loss_price": 1450,
         "other_conditions": "日线MACD金叉",
         "reason": "技术面向好，估值合理",
+        "execution_status": "pending",
         "is_active": true,
         "created_at": "2024-02-01 10:00:00",
         "updated_at": "2024-02-01 10:00:00"
@@ -181,6 +184,7 @@
         "stop_loss_price": 1500,
         "other_conditions": "日线MACD金叉，成交量放大",
         "reason": "技术面继续向好，估值依然合理",
+        "execution_status": "partial",
         "is_active": true,
         "created_at": "2024-02-01 10:00:00",
         "updated_at": "2024-02-01 11:00:00"
@@ -221,6 +225,7 @@
         "stop_loss_price": 1500,
         "other_conditions": "日线MACD金叉，成交量放大",
         "reason": "技术面继续向好，估值依然合理",
+        "execution_status": "partial",
         "is_active": true,
         "created_at": "2024-02-01 10:00:00",
         "updated_at": "2024-02-01 11:00:00"
@@ -228,84 +233,7 @@
 }
 ```
 
-### 6. 根据关键字段更新策略
-
-#### 请求信息
-- 路径: `/api/v1/strategies/update`
-- 方法: POST
-- Content-Type: application/json
-
-#### 请求参数
-```json
-{
-    "stock_name": "贵州茅台",
-    "stock_code": "600519",
-    "action": "buy",
-    "position_ratio": 0.3,
-    "price_min": 1600,
-    "price_max": 1700,
-    "take_profit_price": 1800,
-    "stop_loss_price": 1550,
-    "other_conditions": "日线MACD金叉，成交量放大，KDJ金叉",
-    "reason": "技术面持续向好，估值仍然合理"
-}
-```
-
-#### 响应示例
-```json
-{
-    "code": 200,
-    "message": "策略更新成功",
-    "data": {
-        "id": 1,
-        "stock_name": "贵州茅台",
-        "stock_code": "600519",
-        "action": "buy",
-        "position_ratio": 0.3,
-        "price_min": 1600,
-        "price_max": 1700,
-        "take_profit_price": 1800,
-        "stop_loss_price": 1550,
-        "other_conditions": "日线MACD金叉，成交量放大，KDJ金叉",
-        "reason": "技术面持续向好，估值仍然合理",
-        "is_active": true,
-        "created_at": "2024-02-01 10:00:00",
-        "updated_at": "2024-02-01 12:00:00"
-    }
-}
-```
-
-### 7. 设置策略为失效
-
-#### 请求信息
-- 路径: `/api/v1/strategies/{id}/deactivate`
-- 方法: POST
-
-#### 响应示例
-```json
-{
-    "code": 200,
-    "message": "策略已设置为失效",
-    "data": {
-        "id": 1,
-        "stock_name": "贵州茅台",
-        "stock_code": "600519",
-        "action": "buy",
-        "position_ratio": 0.3,
-        "price_min": 1600,
-        "price_max": 1700,
-        "take_profit_price": 1800,
-        "stop_loss_price": 1550,
-        "other_conditions": "日线MACD金叉，成交量放大，KDJ金叉",
-        "reason": "技术面持续向好，估值仍然合理",
-        "is_active": false,
-        "created_at": "2024-02-01 10:00:00",
-        "updated_at": "2024-02-01 13:00:00"
-    }
-}
-```
-
-### 8. 高级查询策略列表
+### 6. 搜索策略列表
 
 #### 请求信息
 - 路径: `/api/v1/strategies/search`
@@ -314,44 +242,41 @@
 #### 查询参数
 - `start_time`: 开始时间，格式：YYYY-MM-DD HH:mm:ss
 - `end_time`: 结束时间，格式：YYYY-MM-DD HH:mm:ss
-- `stock_code`: 股票代码（支持模糊查询）
-- `stock_name`: 股票名称（支持模糊查询）
-- `sort_by`: 排序字段，可选值：updated_at, created_at，默认 updated_at
-- `order`: 排序方式，可选值：desc, asc，默认 desc
-- `is_active`: 是否只查询有效策略，可选值：true, false，默认 true
-
-#### 请求示例
-```
-GET /api/v1/strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&end_time=2024-02-07 23:59:59&sort_by=created_at&order=desc
-```
+- `stock_code`: 股票代码
+- `stock_name`: 股票名称
+- `action`: 交易动作（buy/sell）
+- `sort_by`: 排序字段，可选值: updated_at, created_at
+- `order`: 排序方式，可选值: desc, asc
+- `is_active`: 是否只查询有效策略（true/false）
 
 #### 响应示例
 ```json
 {
     "code": 200,
-    "message": "成功",
+    "message": "success",
     "data": [
         {
             "id": 1,
             "stock_name": "贵州茅台",
             "stock_code": "600519",
             "action": "buy",
-            "position_ratio": 0.3,
-            "price_min": 1600,
-            "price_max": 1700,
-            "take_profit_price": 1800,
-            "stop_loss_price": 1550,
-            "other_conditions": "日线MACD金叉，成交量放大，KDJ金叉",
-            "reason": "技术面持续向好，估值仍然合理",
+            "position_ratio": 0.2,
+            "price_min": 1550,
+            "price_max": 1650,
+            "take_profit_price": 1750,
+            "stop_loss_price": 1500,
+            "other_conditions": "日线MACD金叉，成交量放大",
+            "reason": "技术面继续向好，估值依然合理",
+            "execution_status": "partial",
             "is_active": true,
             "created_at": "2024-02-01 10:00:00",
-            "updated_at": "2024-02-01 13:00:00"
+            "updated_at": "2024-02-01 11:00:00"
         }
     ]
 }
 ```
 
-### 9. 创建执行记录
+### 7. 创建执行记录
 
 #### 请求信息
 - 路径: `/api/v1/executions`
@@ -362,8 +287,9 @@ GET /api/v1/strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&e
 ```json
 {
     "strategy_id": 1,
-    "execution_price": 1550.5,
+    "execution_price": 1580.5,
     "volume": 100,
+    "strategy_status": "partial",  // 可选值：partial（部分执行）, completed（全部完成）
     "remarks": "按计划执行"
 }
 ```
@@ -372,40 +298,40 @@ GET /api/v1/strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&e
 ```json
 {
     "code": 200,
-    "message": "创建执行记录成功",
+    "message": "成功",
     "data": {
         "id": 1,
         "strategy_id": 1,
-        "stock_name": "贵州茅台",
         "stock_code": "600519",
+        "stock_name": "贵州茅台",
         "action": "buy",
-        "execution_price": 1550.5,
+        "execution_price": 1580.5,
         "volume": 100,
-        "execution_time": "2024-02-08 13:30:00",
         "execution_result": "success",
         "remarks": "按计划执行",
-        "created_at": "2024-02-08 13:30:00",
-        "updated_at": "2024-02-08 13:30:00"
+        "execution_time": "2024-02-01 14:30:00",
+        "created_at": "2024-02-01 14:30:00",
+        "updated_at": "2024-02-01 14:30:00"
     }
 }
 ```
 
-### 10. 获取执行记录列表
+### 8. 获取执行记录列表
 
 #### 请求信息
 - 路径: `/api/v1/executions`
 - 方法: GET
 
 #### 查询参数
-- `strategy_id`: 策略ID（可选）
-- `stock_code`: 股票代码（可选，支持模糊查询）
-- `start_time`: 开始时间（可选，格式：YYYY-MM-DD HH:mm:ss）
-- `end_time`: 结束时间（可选，格式：YYYY-MM-DD HH:mm:ss）
-- `action`: 交易动作（可选，buy/sell）
-- `result`: 执行结果（可选，success/failed/partial）
-- `sort_by`: 排序字段（可选，默认 execution_time）
-- `order`: 排序方式（可选，desc/asc，默认 desc）
-- `limit`: 返回记录数限制（可选）
+- `strategy_id`: 策略ID
+- `stock_code`: 股票代码
+- `start_time`: 开始时间
+- `end_time`: 结束时间
+- `action`: 执行操作（buy/sell）
+- `result`: 执行结果（success/failed/partial）
+- `sort_by`: 排序字段（execution_time/created_at）
+- `order`: 排序方式（desc/asc）
+- `limit`: 限制返回数量
 
 #### 响应示例
 ```json
@@ -416,137 +342,48 @@ GET /api/v1/strategies/search?stock_code=600519&start_time=2024-02-01 00:00:00&e
         {
             "id": 1,
             "strategy_id": 1,
-            "stock_name": "贵州茅台",
             "stock_code": "600519",
+            "stock_name": "贵州茅台",
             "action": "buy",
-            "execution_price": 1550.5,
+            "execution_price": 1580.5,
             "volume": 100,
-            "execution_time": "2024-02-08 13:30:00",
             "execution_result": "success",
             "remarks": "按计划执行",
-            "created_at": "2024-02-08 13:30:00",
-            "updated_at": "2024-02-08 13:30:00"
+            "execution_time": "2024-02-01 14:30:00",
+            "created_at": "2024-02-01 14:30:00",
+            "updated_at": "2024-02-01 14:30:00"
         }
     ]
 }
 ```
 
-### 11. 获取单个执行记录
+### 9. 设置策略状态
 
 #### 请求信息
-- 路径: `/api/v1/executions/{execution_id}`
-- 方法: GET
-
-#### 响应示例
-```json
-{
-    "code": 200,
-    "message": "success",
-    "data": {
-        "id": 1,
-        "strategy_id": 1,
-        "stock_name": "贵州茅台",
-        "stock_code": "600519",
-        "action": "buy",
-        "execution_price": 1550.5,
-        "volume": 100,
-        "execution_time": "2024-02-08 13:30:00",
-        "execution_result": "success",
-        "remarks": "按计划执行",
-        "created_at": "2024-02-08 13:30:00",
-        "updated_at": "2024-02-08 13:30:00"
-    }
-}
-```
-
-### 12. 更新执行记录
-
-#### 请求信息
-- 路径: `/api/v1/executions/{execution_id}`
-- 方法: PUT
-- Content-Type: application/json
-
-#### 请求参数
-```json
-{
-    "execution_price": 1560.5,
-    "volume": 150,
-    "execution_result": "partial",
-    "remarks": "部分成交"
-}
-```
-
-#### 响应示例
-```json
-{
-    "code": 200,
-    "message": "更新执行记录成功",
-    "data": {
-        "id": 1,
-        "strategy_id": 1,
-        "stock_name": "贵州茅台",
-        "stock_code": "600519",
-        "action": "buy",
-        "execution_price": 1560.5,
-        "volume": 150,
-        "execution_time": "2024-02-08 13:30:00",
-        "execution_result": "partial",
-        "remarks": "部分成交",
-        "created_at": "2024-02-08 13:30:00",
-        "updated_at": "2024-02-08 13:35:00"
-    }
-}
-```
-
-### 13. 删除执行记录
-
-#### 请求信息
-- 路径: `/api/v1/executions/{execution_id}`
-- 方法: DELETE
-
-#### 响应示例
-```json
-{
-    "code": 200,
-    "message": "删除执行记录成功",
-    "data": null
-}
-```
-
-### 14. 批量获取执行记录
-
-#### 请求信息
-- 路径: `/api/v1/executions/batch`
+- 路径: `/api/v1/strategies/{id}/deactivate` 或 `/api/v1/strategies/{id}/activate`
 - 方法: POST
-- Content-Type: application/json
-
-#### 请求参数
-```json
-{
-    "strategy_ids": [1, 2, 3],
-    "limit": 3
-}
-```
 
 #### 响应示例
 ```json
 {
     "code": 200,
-    "message": "获取成功",
+    "message": "成功",
     "data": {
-        "1": [
-            {
-                "execution_id": 1,
-                "strategy_id": 1,
-                "execution_time": "2024-02-08 13:30:00",
-                "execution_price": 1550.5,
-                "volume": 100,
-                "execution_result": "success",
-                "created_at": "2024-02-08 13:30:00"
-            }
-        ],
-        "2": [],
-        "3": []
+        "id": 1,
+        "stock_name": "贵州茅台",
+        "stock_code": "600519",
+        "action": "buy",
+        "position_ratio": 0.2,
+        "price_min": 1550,
+        "price_max": 1650,
+        "take_profit_price": 1750,
+        "stop_loss_price": 1500,
+        "other_conditions": "日线MACD金叉，成交量放大",
+        "reason": "技术面继续向好，估值依然合理",
+        "execution_status": "partial",
+        "is_active": false,  // 或 true
+        "created_at": "2024-02-01 10:00:00",
+        "updated_at": "2024-02-01 11:00:00"
     }
 }
 ``` 

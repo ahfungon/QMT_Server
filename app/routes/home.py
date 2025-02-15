@@ -1,22 +1,30 @@
 """
 主页路由模块
 
-此模块定义了主页相关的路由
+此模块提供主页相关的路由
 """
 
+import logging
 from flask import Blueprint, render_template, current_app
+from ..services.strategy import StrategyService
+
+logger = logging.getLogger(__name__)
 
 # 创建蓝图
 home_bp = Blueprint('home', __name__)
 
 @home_bp.route('/')
 def index():
-    """主页"""
+    """渲染主页"""
     try:
-        current_app.logger.info("访问主页")
-        return render_template('index.html')
+        # 获取策略列表
+        strategy_service = StrategyService()
+        strategies = strategy_service.get_all_strategies()
+        
+        # 渲染模板
+        return render_template('index.html', strategies=strategies)
     except Exception as e:
-        current_app.logger.error(f"渲染主页失败: {str(e)}", exc_info=True)
+        logger.error(f"渲染主页失败: {str(e)}")
         return render_template('error.html', error=str(e)), 500
 
 @home_bp.app_errorhandler(403)

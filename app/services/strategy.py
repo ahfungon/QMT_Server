@@ -65,6 +65,7 @@ class StrategyService:
                     f"名称: {strategy.stock_name:10s} | "
                     f"代码: {strategy.stock_code:6s} | "
                     f"是否有效: {'是' if strategy.is_active else '否'} | "
+                    f"执行状态: {strategy.execution_status} | "
                     f"创建时间: {strategy.created_at.strftime('%Y-%m-%d %H:%M:%S')} | "
                     f"更新时间: {strategy.updated_at.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
@@ -81,6 +82,9 @@ class StrategyService:
     def create_strategy(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """创建新策略"""
         try:
+            # 设置初始执行状态为未执行
+            data['execution_status'] = 'pending'
+            
             strategy = StockStrategy(**data)
             db.session.add(strategy)
             db.session.commit()
@@ -107,6 +111,13 @@ class StrategyService:
             for field in required_fields:
                 if field in data and not data[field]:
                     raise ValueError(f"字段 {field} 不能为空")
+            
+            # 检查是否需要更新执行状态
+            if 'position_ratio' in data and strategy.execution_status == 'completed':
+                # 如果新的仓位比例大于原来的，则更新状态为部分执行
+                if data['position_ratio'] > strategy.position_ratio:
+                    data['execution_status'] = 'partial'
+                    logger.info(f"策略 {strategy_id} 的仓位比例增加，状态更新为部分执行")
             
             # 更新字段
             for key, value in data.items():
@@ -163,6 +174,14 @@ class StrategyService:
                 'take_profit_price', 'stop_loss_price',
                 'other_conditions', 'reason'
             ]
+            
+            # 检查是否需要更新执行状态
+            if 'position_ratio' in data and strategy.execution_status == 'completed':
+                # 如果新的仓位比例大于原来的，则更新状态为部分执行
+                if data['position_ratio'] > strategy.position_ratio:
+                    data['execution_status'] = 'partial'
+                    logger.info(f"策略 {strategy.id} 的仓位比例增加，状态更新为部分执行")
+                    has_updates = True
             
             for field in update_fields:
                 if field in data and getattr(strategy, field) != data[field]:
@@ -286,6 +305,7 @@ class StrategyService:
                     f"名称: {strategy.stock_name:10s} | "
                     f"代码: {strategy.stock_code:6s} | "
                     f"是否有效: {'是' if strategy.is_active else '否'} | "
+                    f"执行状态: {strategy.execution_status} | "
                     f"创建时间: {strategy.created_at.strftime('%Y-%m-%d %H:%M:%S')} | "
                     f"更新时间: {strategy.updated_at.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
