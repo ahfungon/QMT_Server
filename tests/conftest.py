@@ -5,7 +5,14 @@
 """
 
 import os
+import sys
+from pathlib import Path
 import pytest
+
+# 添加项目根目录到 Python 路径
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
 from app import create_app
 from app.models import db as _db
 

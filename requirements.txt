@@ -1,14 +1,27 @@
-Flask==3.0.0
+Flask==3.0.2
 Flask-SQLAlchemy==3.1.1
 Flask-CORS==4.0.0
 PyMySQL==1.1.0
-python-dotenv==1.0.0
+python-dotenv==1.0.1
 SQLAlchemy==2.0.27
 zhipuai==2.1.5.20250106
 jsonschema==4.23.0
-requests==2.32.3
-pytz==2025.1
+requests==2.31.0
+pytz==2024.1
 urllib3==1.26.18
 openai==1.12.0
 httpx>=0.24.1
-cryptography==44.0.0
+cryptography==42.0.2
+
+# 测试相关
+pytest==8.0.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# 日志处理
+Werkzeug==3.0.1
+
+# 开发工具
+black==24.1.1
+flake8==7.0.0
+isort==5.13.2

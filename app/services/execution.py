@@ -10,11 +10,16 @@ from datetime import datetime
 from ..models import db
 from ..models.execution import StrategyExecution
 from ..models.stock import StockStrategy
+from .position import PositionService
 
 logger = logging.getLogger(__name__)
 
 class ExecutionService:
     """策略执行记录服务类"""
+    
+    def __init__(self):
+        """初始化持仓服务"""
+        self.position_service = PositionService()
     
     def create_execution(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -66,6 +71,20 @@ class ExecutionService:
             # 更新策略执行状态
             strategy.execution_status = data['strategy_status']
             logger.info(f"策略 {strategy.id} 状态更新为: {data['strategy_status']}")
+            
+            # 更新持仓信息
+            try:
+                position = self.position_service.update_position(
+                    stock_code=strategy.stock_code,
+                    stock_name=strategy.stock_name,
+                    volume=data['volume'],
+                    price=data['execution_price'],
+                    action=strategy.action
+                )
+                logger.info(f"持仓更新成功: {position}")
+            except Exception as e:
+                logger.error(f"持仓更新失败: {str(e)}")
+                raise
             
             db.session.commit()
             return execution.to_dict()

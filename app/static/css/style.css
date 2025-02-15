@@ -330,4 +330,113 @@
     .table-search {
         width: 100% !important;
     }
+}
+
+/* 执行记录买卖底色 */
+.execution-buy {
+    background-color: rgba(220, 53, 69, 0.05) !important;
+}
+
+.execution-sell {
+    background-color: rgba(25, 135, 84, 0.05) !important;
+}
+
+/* 持仓表格样式 */
+.position-table-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1rem;
+    margin-top: 1rem;
+    overflow-x: auto;
+}
+
+.position-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 1rem;
+}
+
+.position-table thead th {
+    background-color: #f8f9fa;
+    padding: 12px 8px;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #dee2e6;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.position-table tbody tr {
+    border-bottom: 1px solid #eee;
+    transition: all 0.2s ease;
+}
+
+.position-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.position-table td {
+    padding: 12px 8px;
+    vertical-align: middle;
+    text-align: right;
+}
+
+.position-table th:first-child,
+.position-table td:first-child,
+.position-table th:nth-child(2),
+.position-table td:nth-child(2) {
+    text-align: left;
+}
+
+.position-total {
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
+
+.position-number {
+    font-family: "Courier New", Courier, monospace;
+    white-space: nowrap;
+}
+
+.position-profit {
+    color: #d81e06 !important;
+    font-weight: bold;
+}
+
+.position-loss {
+    color: #1aad19 !important;
+    font-weight: bold;
+}
+
+.position-time {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* 数字格式化 */
+.number {
+    font-family: Monaco, Consolas, monospace;
+}
+
+/* 盈亏颜色 */
+.profit {
+    color: #d81e06 !important;
+}
+
+.loss {
+    color: #1aad19 !important;
+}
+
+/* 表格响应式 */
+@media (max-width: 768px) {
+    .position-table {
+        font-size: 12px;
+    }
+    
+    .position-table th,
+    .position-table td {
+        padding: 8px 4px;
+    }
 } 

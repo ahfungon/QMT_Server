@@ -60,7 +60,6 @@ def create_app(config_name=None):
     with app.app_context():
         try:
             # 尝试创建数据库（如果不存在）
-            engine = db.get_engine()
             database_name = os.getenv('MYSQL_DATABASE')
             
             # 创建到 MySQL 服务器的连接（不指定数据库）
@@ -72,6 +71,7 @@ def create_app(config_name=None):
             
             # 检查数据库是否存在
             with engine_without_db.connect() as conn:
+                # 使用 text() 包装 SQL 语句
                 result = conn.execute(text(
                     f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{database_name}'"
                 ))
@@ -80,7 +80,10 @@ def create_app(config_name=None):
                 # 只有在数据库不存在时才创建
                 if not database_exists:
                     logging.info(f"数据库 {database_name} 不存在，正在创建...")
-                    conn.execute(text(f"CREATE DATABASE {database_name} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                    conn.execute(text(
+                        f"CREATE DATABASE IF NOT EXISTS {database_name} "
+                        "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                    ))
                     conn.commit()
                     logging.info(f"数据库 {database_name} 创建成功！")
                 else:
@@ -98,9 +101,16 @@ def create_app(config_name=None):
             raise
     
     # 注册蓝图
-    from .routes import strategy_bp, execution_bp, home_bp
+    from .routes import strategy_bp, execution_bp, home_bp, position_bp
     app.register_blueprint(home_bp)
     app.register_blueprint(strategy_bp, url_prefix='/api/v1')
     app.register_blueprint(execution_bp, url_prefix='/api/v1')
+    app.register_blueprint(position_bp, url_prefix='/api/v1')
+    
+    # 启动股价自动更新
+    from .tasks.price_updater import PriceUpdater
+    price_updater = PriceUpdater(app=app)  # 移除固定的interval参数，使用自动调整的更新间隔
+    price_updater.start()
+    app.price_updater = price_updater  # 保存到应用实例中，方便后续管理
     
     return app 

@@ -1,56 +1,69 @@
 """
 日志工具模块
 
-此模块提供日志记录功能
+此模块提供日志相关的工具函数
 """
 
+import os
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+from pathlib import Path
 
-def setup_logger(app):
-    """配置日志记录器"""
-    # 确保日志目录存在
-    log_dir = 'logs'
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+def setup_logger(name_or_app, level=logging.INFO):
+    """
+    设置日志记录器
     
-    # 获取配置
-    log_level = app.config.get('LOG_LEVEL', 'INFO')
-    log_format = app.config.get('LOG_FORMAT', '%(asctime)s [%(levelname)s] %(message)s')
-    log_file = os.path.join(log_dir, app.config.get('LOG_FILE', 'api.log'))
+    Args:
+        name_or_app: 日志记录器名称或 Flask 应用实例
+        level: 日志级别，默认为 INFO
+        
+    Returns:
+        logging.Logger: 配置好的日志记录器
+    """
+    # 如果传入的是 Flask 应用实例，从配置中获取日志级别
+    if hasattr(name_or_app, 'config'):
+        app = name_or_app
+        name = app.import_name
+        level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'))
+    else:
+        name = name_or_app
     
-    # 配置日志
-    formatter = logging.Formatter(log_format)
+    # 创建日志记录器
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
     
-    # 文件处理器
+    # 如果已经有处理器，说明已经配置过，直接返回
+    if logger.handlers:
+        return logger
+    
+    # 创建日志目录
+    log_dir = Path(__file__).parent.parent.parent / 'logs'
+    log_dir.mkdir(exist_ok=True)
+    
+    # 创建文件处理器
+    log_file = log_dir / f'{name}.log'
     file_handler = RotatingFileHandler(
         log_file,
-        maxBytes=10*1024*1024,  # 10MB
+        maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
         encoding='utf-8'
     )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.INFO)  # 确保文件处理器记录INFO级别及以上的日志
     
-    # 控制台处理器
+    # 创建控制台处理器
     console_handler = logging.StreamHandler()
+    
+    # 设置日志格式
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # 应用格式化器
+    file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.INFO)  # 确保控制台处理器记录INFO级别及以上的日志
     
-    # 配置根日志记录器
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)  # 设置根日志记录器的级别为INFO
+    # 添加处理器
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
     
-    # 移除所有现有的处理器
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-    
-    # 添加新的处理器
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
-    
-    # 配置 SQLAlchemy 日志
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-    
-    return root_logger 
+    return logger 
