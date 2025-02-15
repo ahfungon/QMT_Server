@@ -32,6 +32,7 @@ def reset_database():
     env_path = Path(__file__).parent.parent / '.env'
     load_dotenv(env_path, override=True)
     
+    conn = None
     try:
         # 连接 MySQL（不指定数据库）
         conn = pymysql.connect(
@@ -87,19 +88,17 @@ def reset_database():
             for table in tables:
                 logger.info(f"- {table[0]}")
         
-        conn.close()
         logger.info("数据库重置成功！")
         
     except Exception as e:
         logger.error(f"重置数据库失败: {str(e)}")
         raise
     finally:
-        if 'conn' in locals() and conn:
-            conn.close()
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass  # 忽略关闭连接时的错误
 
 if __name__ == '__main__':
-    try:
-        reset_database()
-    except Exception as e:
-        logger.error(f"程序执行失败: {str(e)}")
-        sys.exit(1) 
+    reset_database() 
