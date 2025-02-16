@@ -1368,6 +1368,42 @@
         });
     });
 
+    // 创建策略
+    async function createStrategy() {
+        if (!currentAnalysis) {
+            showToast('warning', '请先分析策略');
+            return;
+        }
+        
+        const createBtn = document.getElementById('createStrategyBtn');
+        const updateBtn = document.getElementById('updateStrategyBtn');
+        
+        try {
+            // 设置按钮加载状态
+            setButtonLoading(createBtn, true);
+            setButtonLoading(updateBtn, true);
+            
+            // 调用创建策略接口
+            const response = await axios.post('/api/v1/strategies', currentAnalysis);
+            
+            if (response.data.code === 200) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('createStrategyModal'));
+                modal.hide();
+                refreshStrategies();
+                showToast('success', '策略创建成功');
+            } else {
+                showToast('error', response.data.message || '策略创建失败');
+            }
+        } catch (error) {
+            console.error('策略创建失败：', error);
+            showToast('error', error.response?.data?.message || '策略创建失败');
+        } finally {
+            // 恢复按钮状态
+            setButtonLoading(createBtn, false);
+            setButtonLoading(updateBtn, false);
+        }
+    }
+
     // 分析后更新策略
     async function updateAnalyzedStrategy() {
         if (!currentAnalysis) {
