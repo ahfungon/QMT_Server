@@ -439,4 +439,80 @@
     .position-table td {
         padding: 8px 4px;
     }
+}
+
+/* 按钮加载动画样式 */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.btn-loading {
+    position: relative !important;
+    color: transparent !important;
+    pointer-events: none !important;
+}
+
+.btn-loading::after {
+    content: '' !important;
+    position: absolute !important;
+    width: 16px !important;
+    height: 16px !important;
+    top: 50% !important;
+    left: 50% !important;
+    margin-top: -8px !important;
+    margin-left: -8px !important;
+    border-radius: 50% !important;
+    border: 2px solid rgba(255, 255, 255, 0.5) !important;
+    border-top-color: #fff !important;
+    animation: spin 0.8s linear infinite !important;
+}
+
+.btn-loading.btn-outline-primary::after,
+.btn-loading.btn-outline-secondary::after,
+.btn-loading.btn-outline-success::after,
+.btn-loading.btn-outline-danger::after,
+.btn-loading.btn-outline-warning::after,
+.btn-loading.btn-outline-info::after {
+    border: 2px solid rgba(0, 123, 255, 0.2) !important;
+    border-top-color: #007bff !important;
+}
+
+/* 保存原始文本 */
+.btn-loading[data-original-text]::before {
+    content: attr(data-original-text);
+    visibility: hidden;
+}
+
+/* 禁用状态样式增强 */
+.btn:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.65 !important;
+}
+
+/* 按钮过渡效果 */
+.btn {
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+/* 按钮点击波纹效果 */
+.btn::after {
+    content: '' !important;
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    opacity: 0 !important;
+    transition: all 0.3s ease !important;
+    pointer-events: none !important;
+}
+
+.btn:active::after {
+    opacity: 1 !important;
+    transform: scale(0) !important;
+    transition: 0s !important;
 } 

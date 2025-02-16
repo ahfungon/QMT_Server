@@ -48,7 +48,7 @@ class ExecutionService:
                 raise ValueError("策略状态必须是 'partial' 或 'completed'")
             
             # 验证策略ID并获取策略信息
-            strategy = StockStrategy.query.get(data['strategy_id'])
+            strategy = db.session.get(StockStrategy, data['strategy_id'])
             if not strategy:
                 raise ValueError(f"策略ID {data['strategy_id']} 不存在")
             
@@ -104,7 +104,7 @@ class ExecutionService:
             Optional[Dict[str, Any]]: 执行记录信息
         """
         try:
-            execution = StrategyExecution.query.get(execution_id)
+            execution = db.session.get(StrategyExecution, execution_id)
             return execution.to_dict() if execution else None
         except Exception as e:
             logger.error(f"获取执行记录失败: {str(e)}", exc_info=True)
@@ -140,7 +140,7 @@ class ExecutionService:
         """
         try:
             # 构建查询
-            query = StrategyExecution.query
+            query = db.select(StrategyExecution)
             
             # 添加过滤条件
             if strategy_id:
@@ -171,7 +171,7 @@ class ExecutionService:
                 query = query.limit(limit)
             
             # 执行查询
-            executions = query.all()
+            executions = db.session.execute(query).scalars().all()
             return [execution.to_dict() for execution in executions]
             
         except Exception as e:
@@ -190,7 +190,9 @@ class ExecutionService:
             Dict[str, Any]: 更新后的执行记录
         """
         try:
-            execution = StrategyExecution.query.get_or_404(execution_id)
+            execution = db.session.get(StrategyExecution, execution_id)
+            if not execution:
+                raise ValueError(f"执行记录不存在，ID: {execution_id}")
             
             # 更新字段
             for key, value in data.items():
@@ -199,12 +201,11 @@ class ExecutionService:
             
             # 如果更新了执行量，需要重新计算策略执行状态
             if 'volume' in data:
-                strategy = StockStrategy.query.get(execution.strategy_id)
+                strategy = db.session.get(StockStrategy, execution.strategy_id)
                 if strategy:
                     # 获取该策略的所有执行记录
-                    all_executions = StrategyExecution.query.filter_by(
-                        strategy_id=strategy.id
-                    ).all()
+                    query = db.select(StrategyExecution).filter_by(strategy_id=strategy.id)
+                    all_executions = db.session.execute(query).scalars().all()
                     
                     # 计算已执行的总量
                     total_executed_volume = sum(e.volume for e in all_executions)
@@ -239,19 +240,20 @@ class ExecutionService:
             bool: 是否删除成功
         """
         try:
-            execution = StrategyExecution.query.get_or_404(execution_id)
+            execution = db.session.get(StrategyExecution, execution_id)
+            if not execution:
+                raise ValueError(f"执行记录不存在，ID: {execution_id}")
             
             # 获取策略信息
-            strategy = StockStrategy.query.get(execution.strategy_id)
+            strategy = db.session.get(StockStrategy, execution.strategy_id)
             if strategy:
                 # 删除当前执行记录后重新计算策略执行状态
                 db.session.delete(execution)
                 db.session.flush()  # 刷新会话，使删除生效但不提交
                 
                 # 获取剩余的执行记录
-                remaining_executions = StrategyExecution.query.filter_by(
-                    strategy_id=strategy.id
-                ).all()
+                query = db.select(StrategyExecution).filter_by(strategy_id=strategy.id)
+                remaining_executions = db.session.execute(query).scalars().all()
                 
                 # 计算剩余执行量
                 total_executed_volume = sum(e.volume for e in remaining_executions)

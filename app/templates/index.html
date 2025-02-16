@@ -416,7 +416,7 @@
                     <button type="button" class="btn btn-success d-none" id="createStrategyBtn" onclick="createStrategy()">
                         确认创建
                     </button>
-                    <button type="button" class="btn btn-warning d-none" id="updateStrategyBtn" onclick="updateStrategy()">
+                    <button type="button" class="btn btn-warning d-none" id="updateStrategyBtn" onclick="updateAnalyzedStrategy()">
                         确认更新
                     </button>
                 </div>
@@ -764,29 +764,33 @@
 
     // 更新策略
     async function updateStrategy() {
+        const strategyId = document.getElementById('editStrategyId').value;
+        const data = {
+            position_ratio: parseFloat(document.getElementById('editPositionRatio').value),
+            price_min: parseFloat(document.getElementById('editPriceMin').value) || null,
+            price_max: parseFloat(document.getElementById('editPriceMax').value) || null,
+            take_profit_price: parseFloat(document.getElementById('editTakeProfitPrice').value) || null,
+            stop_loss_price: parseFloat(document.getElementById('editStopLossPrice').value) || null,
+            other_conditions: document.getElementById('editOtherConditions').value.trim(),
+            reason: document.getElementById('editReason').value.trim()
+        };
+
+        // 验证仓位比例
+        if (isNaN(data.position_ratio) || data.position_ratio <= 0 || data.position_ratio > 1) {
+            showToast('error', '请输入有效的仓位比例（0-1之间）');
+            return;
+        }
+
         try {
-            const strategyId = document.getElementById('editStrategyId').value;
-            const data = {
-                stock_name: document.getElementById('editStockName').value,
-                stock_code: document.getElementById('editStockCode').value,
-                action: document.getElementById('editAction').value === '买入' ? 'buy' : 'sell',
-                position_ratio: parseFloat(document.getElementById('editPositionRatio').value),
-                price_min: document.getElementById('editPriceMin').value ? parseFloat(document.getElementById('editPriceMin').value) : null,
-                price_max: document.getElementById('editPriceMax').value ? parseFloat(document.getElementById('editPriceMax').value) : null,
-                take_profit_price: document.getElementById('editTakeProfitPrice').value ? parseFloat(document.getElementById('editTakeProfitPrice').value) : null,
-                stop_loss_price: document.getElementById('editStopLossPrice').value ? parseFloat(document.getElementById('editStopLossPrice').value) : null,
-                other_conditions: document.getElementById('editOtherConditions').value,
-                reason: document.getElementById('editReason').value
-            };
+            const updateBtn = document.querySelector('#editStrategyModal .btn-primary');
+            setButtonLoading(updateBtn, true);
 
             const response = await axios.put(`/api/v1/strategies/${strategyId}`, data);
-
+            
             if (response.data.code === 200) {
-                // 重置模态框并关闭
                 const modal = bootstrap.Modal.getInstance(document.getElementById('editStrategyModal'));
                 modal.hide();
-                // 刷新策略列表
-                refreshStrategies();
+                await refreshStrategies();
                 showToast('success', '策略更新成功');
             } else {
                 showToast('error', response.data.message || '策略更新失败');
@@ -794,6 +798,9 @@
         } catch (error) {
             console.error('更新策略失败:', error);
             showToast('error', error.response?.data?.message || '更新策略失败');
+        } finally {
+            const updateBtn = document.querySelector('#editStrategyModal .btn-primary');
+            setButtonLoading(updateBtn, false);
         }
     }
 
@@ -903,58 +910,6 @@
         currentAnalysis = null;
     }
 
-    // 创建策略
-    async function createStrategy() {
-        if (!currentAnalysis) {
-            showToast('warning', '请先分析策略');
-            return;
-        }
-        
-        try {
-            // 先检查是否存在相同的有效策略
-            const checkResponse = await axios.post('/api/v1/strategies/check', {
-                stock_name: currentAnalysis.stock_name,
-                stock_code: currentAnalysis.stock_code,
-                action: currentAnalysis.action
-            });
-            
-            let response;
-            if (checkResponse.data.code === 200 && checkResponse.data.data) {
-                // 如果存在相同的策略，则调用更新接口
-                const existingStrategy = checkResponse.data.data;
-                response = await axios.put(`/api/v1/strategies/${existingStrategy.id}`, currentAnalysis);
-                if (response.data.code === 200) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createStrategyModal'));
-                    modal.hide();
-                    refreshStrategies();
-                    showToast('success', '已更新现有策略');
-                }
-            } else {
-                // 如果不存在，则创建新策略
-                response = await axios.post('/api/v1/strategies', currentAnalysis);
-                if (response.data.code === 200) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createStrategyModal'));
-                    modal.hide();
-                    refreshStrategies();
-                    showToast('success', '策略创建成功');
-                }
-            }
-        } catch (error) {
-            console.error('策略创建/更新失败：', error);
-            showToast('error', '策略创建/更新失败');
-        }
-    }
-
-    // 显示执行策略模态框
-    function showExecuteStrategyModal(strategyId) {
-        document.getElementById('executeStrategyId').value = strategyId;
-        document.getElementById('executionPrice').value = '';
-        document.getElementById('executionVolume').value = '';
-        document.getElementById('executionStatus').value = '';
-        document.getElementById('executionRemarks').value = '';
-        executeStrategyModal.show();
-    }
-    
     // 分析策略
     async function analyzeStrategy() {
         try {
@@ -965,47 +920,32 @@
             }
 
             // 显示加载状态
-            document.getElementById('analyzeStrategyBtn').disabled = true;
-            document.getElementById('analyzeStrategyBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 分析中...';
+            const analyzeBtn = document.getElementById('analyzeStrategyBtn');
+            setButtonLoading(analyzeBtn, true);
 
-            const response = await fetch('/api/v1/analyze_strategy', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ strategy_text: strategyText })
+            const response = await axios.post('/api/v1/analyze_strategy', {
+                strategy_text: strategyText
             });
 
-            const result = await response.json();
-            
-            // 在分析结果区域显示 JSON
-            const analysisResult = document.getElementById('analysisResult');
-            analysisResult.textContent = JSON.stringify(result, null, 2);
-
-            if (result.code === 200 && result.data) {
+            if (response.data.code === 200 && response.data.data) {
                 // 保存当前分析结果
-                currentAnalysis = result.data;
+                currentAnalysis = response.data.data;
                 
+                // 在分析结果区域显示 JSON
+                const analysisResult = document.getElementById('analysisResult');
+                analysisResult.textContent = JSON.stringify(response.data, null, 2);
+
                 // 检查是否存在相同策略
-                const checkResponse = await fetch('/api/v1/strategies/check', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        stock_name: result.data.stock_name,
-                        stock_code: result.data.stock_code,
-                        action: result.data.action
-                    })
+                const checkResponse = await axios.post('/api/v1/strategies/check', {
+                    stock_name: currentAnalysis.stock_name,
+                    stock_code: currentAnalysis.stock_code,
+                    action: currentAnalysis.action
                 });
 
-                const checkResult = await checkResponse.json();
-                
                 // 隐藏分析按钮
                 document.getElementById('analyzeStrategyBtn').classList.add('d-none');
-                
-                // 根据检查结果显示不同的按钮
-                if (checkResult.code === 200 && checkResult.data) {
+
+                if (checkResponse.data.code === 200 && checkResponse.data.data) {
                     // 存在相同策略，显示更新按钮
                     document.getElementById('updateStrategyBtn').classList.remove('d-none');
                     document.getElementById('createStrategyBtn').classList.add('d-none');
@@ -1017,15 +957,13 @@
                     showToast('success', '策略分析成功，可以创建新策略');
                 }
             } else {
-                showToast('error', result.message || '策略分析失败');
+                showToast('error', response.data.message || '策略分析失败');
             }
         } catch (error) {
             console.error('分析策略失败:', error);
-            showToast('error', '分析策略失败');
+            showToast('error', error.response?.data?.message || '分析策略失败');
         } finally {
-            // 恢复按钮状态
-            document.getElementById('analyzeStrategyBtn').disabled = false;
-            document.getElementById('analyzeStrategyBtn').innerHTML = '分析策略';
+            setButtonLoading(document.getElementById('analyzeStrategyBtn'), false);
         }
     }
     
@@ -1040,9 +978,13 @@
 
             // 验证必填字段
             if (!executionPrice || !executionVolume || !executionStatus) {
-                showToast('danger', '请填写所有必要字段');
+                showToast('error', '请填写所有必要字段');
                 return;
             }
+
+            // 设置按钮加载状态
+            const executeBtn = document.querySelector('#executeStrategyModal .btn-primary');
+            setButtonLoading(executeBtn, true);
 
             const response = await axios.post('/api/v1/executions', {
                 strategy_id: strategyId,
@@ -1074,11 +1016,15 @@
                 // 如果当前在执行记录标签页，更新最后更新时间
                 updateExecutionLastUpdateTime();
             } else {
-                showToast('danger', response.data.message || '创建执行记录失败');
+                showToast('error', response.data.message || '创建执行记录失败');
             }
         } catch (error) {
             console.error('执行策略失败:', error);
-            showToast('danger', error.response?.data?.message || '执行策略失败');
+            showToast('error', error.response?.data?.message || '执行策略失败');
+        } finally {
+            // 恢复按钮状态
+            const executeBtn = document.querySelector('#executeStrategyModal .btn-primary');
+            setButtonLoading(executeBtn, false);
         }
     }
 
@@ -1366,6 +1312,104 @@
             <td>-</td>
         `;
         tbody.appendChild(totalTr);
+    }
+
+    // 按钮加载状态控制
+    function setButtonLoading(button, isLoading) {
+        if (isLoading) {
+            // 保存原始文本
+            const originalText = button.textContent;
+            button.setAttribute('data-original-text', originalText);
+            
+            // 添加加载样式
+            button.classList.add('btn-loading');
+            button.disabled = true;
+        } else {
+            // 恢复原始文本
+            const originalText = button.getAttribute('data-original-text');
+            if (originalText) {
+                button.textContent = originalText;
+                button.removeAttribute('data-original-text');
+            }
+            
+            // 移除加载样式
+            button.classList.remove('btn-loading');
+            button.disabled = false;
+        }
+    }
+
+    // 为所有表单添加提交事件处理
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(event) {
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    setButtonLoading(submitButton, true);
+                }
+            });
+        });
+    });
+
+    // 为所有按钮添加点击事件处理
+    document.addEventListener('DOMContentLoaded', function() {
+        const actionButtons = document.querySelectorAll('.btn-action');
+        actionButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                if (!button.classList.contains('btn-loading')) {
+                    setButtonLoading(button, true);
+                    
+                    // 在 AJAX 请求完成后恢复按钮状态
+                    setTimeout(() => {
+                        setButtonLoading(button, false);
+                    }, 2000); // 这里的延时应该根据实际 AJAX 请求的完成时间来设置
+                }
+            });
+        });
+    });
+
+    // 分析后更新策略
+    async function updateAnalyzedStrategy() {
+        if (!currentAnalysis) {
+            showToast('warning', '请先分析策略');
+            return;
+        }
+        
+        const createBtn = document.getElementById('createStrategyBtn');
+        const updateBtn = document.getElementById('updateStrategyBtn');
+        
+        try {
+            // 设置按钮加载状态
+            setButtonLoading(createBtn, true);
+            setButtonLoading(updateBtn, true);
+            
+            // 先检查是否存在相同的有效策略
+            const checkResponse = await axios.post('/api/v1/strategies/check', {
+                stock_name: currentAnalysis.stock_name,
+                stock_code: currentAnalysis.stock_code,
+                action: currentAnalysis.action
+            });
+            
+            let response;
+            if (checkResponse.data.code === 200 && checkResponse.data.data) {
+                // 如果存在相同的策略，则调用更新接口
+                const existingStrategy = checkResponse.data.data;
+                response = await axios.put(`/api/v1/strategies/${existingStrategy.id}`, currentAnalysis);
+                if (response.data.code === 200) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createStrategyModal'));
+                    modal.hide();
+                    refreshStrategies();
+                    showToast('success', '已更新现有策略');
+                }
+            }
+        } catch (error) {
+            console.error('策略更新失败：', error);
+            showToast('error', error.response?.data?.message || '策略更新失败');
+        } finally {
+            // 恢复按钮状态
+            setButtonLoading(createBtn, false);
+            setButtonLoading(updateBtn, false);
+        }
     }
 </script>
 </body>

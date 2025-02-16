@@ -13,7 +13,7 @@ class TestingConfig(BaseConfig):
     TESTING = True
     DEBUG = False
     
-    # 使用 MySQL 数据库进行测试
+    # 使用现有数据库
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
         f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/"

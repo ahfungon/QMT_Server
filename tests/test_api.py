@@ -11,6 +11,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 import logging
+from sqlalchemy import text
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent
@@ -36,12 +37,7 @@ def app():
         db.drop_all()  # 先删除所有表
         db.create_all()  # 重新创建表
         
-    yield app
-    
-    # 清理测试数据
-    with app.app_context():
-        db.session.remove()
-        db.drop_all()
+    return app  # 直接返回 app，不使用 yield，这样测试后不会清理数据
 
 @pytest.fixture
 def client(app):
@@ -71,12 +67,14 @@ class TestStrategyAPI:
     """策略相关接口测试"""
     
     def setup_method(self, method):
-        """每个测试方法执行前清理数据库"""
+        """每个测试方法执行前的准备工作"""
         self.app = create_app()
         with self.app.app_context():
-            db.drop_all()  # 先删除所有表
-            db.create_all()  # 重新创建表
-            db.session.commit()  # 提交事务
+            # 清理测试数据
+            db.session.execute(text("DELETE FROM strategy_executions"))
+            db.session.execute(text("DELETE FROM stock_positions"))
+            db.session.execute(text("DELETE FROM stock_strategies"))
+            db.session.commit()
 
     def test_analyze_strategy(self, client):
         """测试策略分析接口"""
@@ -148,44 +146,20 @@ class TestStrategyAPI:
         
     def test_update_strategy(self, client, strategy_id=None):
         """测试更新策略"""
+        # 如果没有传入策略ID，则创建新策略
         if strategy_id is None:
-            # 1. 创建策略
-            create_url = '/api/v1/strategies'
-            create_data = {
-                "stock_name": "贵州茅台",
-                "stock_code": "600519",
-                "action": "buy",
-                "position_ratio": 0.1,
-                "price_min": 1500,
-                "price_max": 1600,
-                "take_profit_price": 1700,
-                "stop_loss_price": 1450,
-                "other_conditions": "日线MACD金叉",
-                "reason": "技术面向好，估值合理"
-            }
-
-            create_response = client.post(create_url, json=create_data)
-            create_result = create_response.get_json()
-
-            log_test_case("创建策略", create_url, "POST", create_data, None, create_result)
-            assert create_response.status_code == 200
-            assert create_result['code'] == 200
-            assert 'data' in create_result
-            strategy_id = create_result['data']['id']
-
-        # 2. 更新策略
+            strategy_id = self.test_create_and_get_strategy(client)
+        
+        # 更新策略
         update_url = f'/api/v1/strategies/{strategy_id}'
         update_data = {
-            "stock_name": "贵州茅台",
-            "stock_code": "600519",
-            "action": "buy",
-            "position_ratio": 0.2,  # 修改仓位比例
-            "price_min": 1550,  # 修改最低价
-            "price_max": 1650,  # 修改最高价
-            "take_profit_price": 1750,  # 修改止盈价
-            "stop_loss_price": 1500,  # 修改止损价
-            "other_conditions": "日线MACD金叉，KDJ金叉",  # 修改其他条件
-            "reason": "技术面向好，估值合理，市场情绪乐观"  # 修改原因
+            "position_ratio": 0.2,
+            "price_min": 1550,
+            "price_max": 1650,
+            "take_profit_price": 1750,
+            "stop_loss_price": 1500,
+            "other_conditions": "日线MACD金叉，成交量放大",
+            "reason": "技术面继续向好，估值依然合理"
         }
 
         update_response = client.put(update_url, json=update_data)
@@ -200,17 +174,18 @@ class TestStrategyAPI:
         assert update_result['data']['price_max'] == 1650
         assert update_result['data']['take_profit_price'] == 1750
         assert update_result['data']['stop_loss_price'] == 1500
-        assert update_result['data']['other_conditions'] == "日线MACD金叉，KDJ金叉"
-        assert update_result['data']['reason'] == "技术面向好，估值合理，市场情绪乐观"
+        assert update_result['data']['other_conditions'] == "日线MACD金叉，成交量放大"
+        assert update_result['data']['reason'] == "技术面继续向好，估值依然合理"
 
         return strategy_id
         
-    def test_deactivate_strategy(self, client):
+    def test_deactivate_strategy(self, client, strategy_id=None):
         """测试设置策略失效"""
-        # 1. 先创建策略
-        strategy_id = self.test_create_and_get_strategy(client)
+        # 如果没有传入策略ID，则创建新策略
+        if strategy_id is None:
+            strategy_id = self.test_create_and_get_strategy(client)
         
-        # 2. 设置策略失效
+        # 设置策略失效
         url = f'/api/v1/strategies/{strategy_id}/deactivate'
         
         response = client.post(url)
@@ -221,7 +196,7 @@ class TestStrategyAPI:
         assert result['code'] == 200
         assert result['data']['is_active'] == False
         
-        # 3. 再次激活策略
+        # 再次激活策略
         url = f'/api/v1/strategies/{strategy_id}/activate'
         
         response = client.post(url)
@@ -236,25 +211,26 @@ class TestExecutionAPI:
     """执行记录相关接口测试"""
     
     def setup_method(self, method):
-        """每个测试方法执行前清理数据库"""
+        """每个测试方法执行前的准备工作"""
         self.app = create_app()
         with self.app.app_context():
-            db.drop_all()  # 先删除所有表
-            db.create_all()  # 重新创建表
-            db.session.commit()  # 提交事务
+            # 清理测试数据
+            db.session.execute(text("DELETE FROM strategy_executions"))
+            db.session.execute(text("DELETE FROM stock_positions"))
+            db.session.execute(text("DELETE FROM stock_strategies"))
+            db.session.commit()
 
-    def test_create_execution(self, client):
+    def test_create_execution(self, client, strategy_id=None):
         """测试创建执行记录"""
-        # 1. 先创建策略
-        strategy_id = TestStrategyAPI().test_create_and_get_strategy(client)
+        # 如果没有传入策略ID，则创建新策略
+        if strategy_id is None:
+            strategy_api = TestStrategyAPI()
+            strategy_id = strategy_api.test_create_and_get_strategy(client)
         
-        # 2. 创建执行记录
+        # 创建执行记录
         url = '/api/v1/executions'
         data = {
             "strategy_id": strategy_id,
-            "stock_code": "600519",
-            "stock_name": "贵州茅台",
-            "action": "buy",
             "execution_price": 1580.5,
             "volume": 100,
             "strategy_status": "partial",
@@ -273,38 +249,93 @@ class TestExecutionAPI:
         
         return result['data']['id']
         
-    def test_get_executions(self, client):
+    def test_get_executions(self, client, strategy_id=None):
         """测试获取执行记录列表"""
-        # 1. 先创建执行记录
-        execution_id = self.test_create_execution(client)
+        # 如果没有传入 strategy_id，则创建一个新的策略
+        if strategy_id is None:
+            strategy_api = TestStrategyAPI()
+            strategy_id = strategy_api.test_create_and_get_strategy(client)
+
+        # 创建执行记录
+        execution_id = self.test_create_execution(client, strategy_id)
         
-        # 2. 获取执行记录列表
-        url = '/api/v1/executions'
-        
-        response = client.get(url)
-        result = response.get_json()
-        
-        log_test_case("获取执行记录列表", url, "GET")
-        assert response.status_code == 200
-        assert result['code'] == 200
-        assert len(result['data']) > 0
-        assert result['data'][0]['id'] == execution_id
+        # 获取执行记录列表
+        get_url = '/api/v1/executions'
+        get_response = client.get(get_url)
+        get_result = get_response.get_json()
+
+        log_test_case("获取执行记录列表", get_url, "GET")
+        assert get_response.status_code == 200
+        assert get_result['code'] == 200
+        assert len(get_result['data']) > 0
+
+        return execution_id
 
 class TestPositionAPI:
     """持仓相关接口测试"""
     
     def setup_method(self, method):
-        """每个测试方法执行前清理数据库"""
+        """每个测试方法执行前的准备工作"""
         self.app = create_app()
         with self.app.app_context():
-            db.drop_all()  # 先删除所有表
-            db.create_all()  # 重新创建表
-            db.session.commit()  # 提交事务
+            # 清理测试数据
+            db.session.execute(text("DELETE FROM strategy_executions"))
+            db.session.execute(text("DELETE FROM stock_positions"))
+            db.session.execute(text("DELETE FROM stock_strategies"))
+            db.session.commit()
 
-    def test_position_workflow(self, client):
+    def test_position_workflow(self, client, strategy_id=None):
         """测试完整的持仓工作流程"""
-        # 1. 创建策略并执行，这会创建持仓
-        execution_id = TestExecutionAPI().test_create_execution(client)
+        # 1. 如果没有传入策略ID，则创建策略并执行
+        if strategy_id is None:
+            # 先检查是否已存在相同股票的策略
+            response = client.get('/api/v1/strategies')
+            result = response.get_json()
+            existing_strategy = None
+            if result['code'] == 200 and result['data']:
+                for strategy in result['data']:
+                    if strategy['stock_code'] == '600519' and strategy['is_active']:
+                        existing_strategy = strategy
+                        strategy_id = strategy['id']
+                        break
+            
+            if not existing_strategy:
+                # 如果不存在，则创建新策略
+                execution_api = TestExecutionAPI()
+                execution_id = execution_api.test_create_execution(client)
+                logger.info(f"创建新策略并执行，执行记录ID: {execution_id}")
+            else:
+                # 如果存在，则更新策略
+                update_url = f'/api/v1/strategies/{strategy_id}'
+                update_data = {
+                    "position_ratio": 0.2,  # 增加仓位比例
+                    "price_min": 1550,
+                    "price_max": 1650,
+                    "take_profit_price": 1750,
+                    "stop_loss_price": 1500,
+                    "other_conditions": "日线MACD金叉，成交量放大",
+                    "reason": "技术面继续向好，估值依然合理"
+                }
+                response = client.put(update_url, json=update_data)
+                result = response.get_json()
+                assert response.status_code == 200
+                assert result['code'] == 200
+                logger.info(f"更新已存在的策略，ID: {strategy_id}")
+                
+                # 创建新的执行记录
+                execution_url = '/api/v1/executions'
+                execution_data = {
+                    "strategy_id": strategy_id,
+                    "execution_price": 1580.5,
+                    "volume": 100,
+                    "strategy_status": "partial",
+                    "remarks": "追加买入"
+                }
+                response = client.post(execution_url, json=execution_data)
+                result = response.get_json()
+                assert response.status_code == 200
+                execution_id = result['data']['id']
+                logger.info(f"创建新的执行记录，ID: {execution_id}")
         
         # 2. 获取所有持仓
         url = '/api/v1/positions'
@@ -340,31 +371,87 @@ class TestPositionAPI:
         assert result['code'] == 200
         assert result['data']['latest_price'] == 1600.0
 
-def test_complete_workflow(client):
+def test_complete_workflow(client, app):
     """测试完整的业务流程"""
     logger.info("开始测试完整业务流程...")
-    
+
     # 1. 策略相关测试
     strategy_api = TestStrategyAPI()
-    strategy_api.setup_method(None)  # 先清理数据库
+
+    # 只在开始时清理一次数据
+    with app.app_context():
+        # 清理数据前先检查表是否存在
+        try:
+            db.session.execute(text("DELETE FROM strategy_executions"))
+            db.session.execute(text("DELETE FROM stock_positions"))
+            db.session.execute(text("DELETE FROM stock_strategies"))
+            db.session.commit()
+            logger.info("清理历史数据完成，开始执行测试...")
+        except Exception as e:
+            logger.error(f"清理数据时出错: {str(e)}")
+            db.session.rollback()
+
+    # 1.1 测试策略分析
     strategy_api.test_analyze_strategy(client)
+
+    # 1.2 测试空策略列表
     strategy_api.test_get_strategies_empty(client)
-    strategy_id = strategy_api.test_create_and_get_strategy(client)
+
+    # 1.3 创建策略并获取策略ID
+    create_url = '/api/v1/strategies'
+    create_data = {
+        "stock_name": "贵州茅台",
+        "stock_code": "600519",
+        "action": "buy",
+        "position_ratio": 0.1,
+        "price_min": 1500,
+        "price_max": 1600,
+        "take_profit_price": 1700,
+        "stop_loss_price": 1450,
+        "other_conditions": "日线MACD金叉",
+        "reason": "技术面向好，估值合理"
+    }
+
+    create_response = client.post(create_url, json=create_data)
+    create_result = create_response.get_json()
+    assert create_response.status_code == 200
+    assert create_result['code'] == 200
+    strategy_id = create_result['data']['id']
+    logger.info(f"创建策略成功，ID: {strategy_id}")
+
+    # 1.4 更新策略
     strategy_api.test_update_strategy(client, strategy_id)
-    strategy_api.test_deactivate_strategy(client)
-    
+    logger.info(f"更新策略成功，ID: {strategy_id}")
+
+    # 1.5 测试策略状态切换
+    strategy_api.test_deactivate_strategy(client, strategy_id)
+    logger.info(f"策略状态切换成功，ID: {strategy_id}")
+
     # 2. 执行记录相关测试
     execution_api = TestExecutionAPI()
-    execution_api.setup_method(None)  # 先清理数据库
-    execution_id = execution_api.test_create_execution(client)
-    execution_api.test_get_executions(client)
-    
+
+    # 2.1 测试创建执行记录
+    execution_id = execution_api.test_create_execution(client, strategy_id)
+    logger.info(f"创建执行记录成功，ID: {execution_id}")
+
+    # 2.2 测试获取执行记录列表
+    execution_api.test_get_executions(client, strategy_id)
+
     # 3. 持仓相关测试
     position_api = TestPositionAPI()
-    position_api.setup_method(None)  # 先清理数据库
-    position_api.test_position_workflow(client)
-    
+
+    # 3.1 测试获取持仓列表
+    position_api.test_position_workflow(client, strategy_id)
+
     logger.info("完整业务流程测试完成！")
+
+    # 最后验证只有一个策略
+    get_response = client.get('/api/v1/strategies')
+    get_result = get_response.get_json()
+    assert get_response.status_code == 200
+    assert get_result['code'] == 200
+    assert len(get_result['data']) == 1, f"期望只有1个策略，但实际有 {len(get_result['data'])} 个策略"
+    assert get_result['data'][0]['id'] == strategy_id, f"策略ID不匹配，期望 {strategy_id}，实际为 {get_result['data'][0]['id']}"
 
 if __name__ == '__main__':
     pytest.main(['-v', __file__])

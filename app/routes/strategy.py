@@ -208,28 +208,43 @@ def update_strategy(id):
 
 @strategy_bp.route('/strategies/check', methods=['POST'])
 def check_strategy():
-    """检查策略是否存在"""
+    """检查是否存在相同的有效策略"""
     try:
-        log_request_info(request)
-        
         data = request.get_json()
-        if not all(k in data for k in ['stock_name', 'stock_code', 'action']):
-            return error_response('缺少必要参数', 400)
-
+        if not data:
+            return jsonify({
+                'code': 400,
+                'message': '请求数据不能为空'
+            }), 400
+            
+        # 验证必要字段
+        required_fields = ['stock_name', 'stock_code', 'action']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'code': 400,
+                    'message': f'缺少必要字段: {field}'
+                }), 400
+        
+        # 检查是否存在相同的有效策略
         strategy = strategy_service.check_strategy_exists(
-            data['stock_name'],
-            data['stock_code'],
-            data['action']
+            stock_name=data['stock_name'],
+            stock_code=data['stock_code'],
+            action=data['action']
         )
         
-        response = success_response(strategy)
-        log_response_info(response.get_json())
-        return response
+        return jsonify({
+            'code': 200,
+            'message': 'success',
+            'data': strategy
+        })
         
     except Exception as e:
-        response = error_response(f'检查策略失败: {str(e)}', 500)
-        log_response_info(response.get_json())
-        return response
+        current_app.logger.error(f'检查策略失败: {str(e)}')
+        return jsonify({
+            'code': 500,
+            'message': f'检查策略失败: {str(e)}'
+        }), 500
 
 @strategy_bp.route('/strategies/update', methods=['POST'])
 def update_strategy_by_key():
