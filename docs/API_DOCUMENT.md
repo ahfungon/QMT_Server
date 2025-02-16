@@ -37,7 +37,7 @@
 #### 请求参数
 ```json
 {
-    "strategy_text": "策略文本内容"
+    "strategy_text": "我看好贵州茅台，计划以1500-1600元价格区间买入，止盈1700，止损1450，日线MACD金叉"
 }
 ```
 
@@ -56,8 +56,7 @@
         "take_profit_price": 1700,
         "stop_loss_price": 1450,
         "other_conditions": "日线MACD金叉",
-        "reason": "技术面向好，估值合理",
-        "execution_status": "pending"
+        "reason": "技术面向好，估值合理"
     }
 }
 ```
@@ -126,7 +125,7 @@
 ```json
 {
     "code": 200,
-    "message": "成功",
+    "message": "success",
     "data": {
         "id": 1,
         "stock_name": "贵州茅台",
@@ -171,7 +170,7 @@
 ```json
 {
     "code": 200,
-    "message": "成功",
+    "message": "策略更新成功",
     "data": {
         "id": 1,
         "stock_name": "贵州茅台",
@@ -184,10 +183,10 @@
         "stop_loss_price": 1500,
         "other_conditions": "日线MACD金叉，成交量放大",
         "reason": "技术面继续向好，估值依然合理",
-        "execution_status": "partial",
+        "execution_status": "pending",
         "is_active": true,
         "created_at": "2024-02-01 10:00:00",
-        "updated_at": "2024-02-01 11:00:00"
+        "updated_at": "2024-02-01 10:30:00"
     }
 }
 ```
@@ -270,7 +269,7 @@
             "execution_status": "partial",
             "is_active": true,
             "created_at": "2024-02-01 10:00:00",
-            "updated_at": "2024-02-01 11:00:00"
+            "updated_at": "2024-02-01 10:30:00"
         }
     ]
 }
@@ -287,9 +286,9 @@
 ```json
 {
     "strategy_id": 1,
-    "execution_price": 1580.5,
+    "execution_price": 1580,
     "volume": 100,
-    "strategy_status": "partial",  // 可选值：partial（部分执行）, completed（全部完成）
+    "strategy_status": "partial",
     "remarks": "按计划执行"
 }
 ```
@@ -298,20 +297,20 @@
 ```json
 {
     "code": 200,
-    "message": "成功",
+    "message": "执行记录创建成功",
     "data": {
         "id": 1,
         "strategy_id": 1,
         "stock_code": "600519",
         "stock_name": "贵州茅台",
         "action": "buy",
-        "execution_price": 1580.5,
+        "execution_price": 1580,
         "volume": 100,
+        "execution_time": "2024-02-01 10:35:00",
         "execution_result": "success",
         "remarks": "按计划执行",
-        "execution_time": "2024-02-01 14:30:00",
-        "created_at": "2024-02-01 14:30:00",
-        "updated_at": "2024-02-01 14:30:00"
+        "created_at": "2024-02-01 10:35:00",
+        "updated_at": "2024-02-01 10:35:00"
     }
 }
 ```
@@ -479,20 +478,21 @@
 ```json
 {
     "code": 200,
-    "message": "success",
+    "message": "更新市值成功",
     "data": {
         "id": 1,
         "stock_code": "600519",
         "stock_name": "贵州茅台",
         "total_volume": 100,
-        "average_cost": 1550.5,
-        "total_amount": 155050.0,
-        "latest_price": 1600.0,
-        "market_value": 160000.0,
-        "floating_profit": 4950.0,
-        "floating_profit_ratio": 0.0319,
-        "created_at": "2025-02-14 19:42:44",
-        "updated_at": "2025-02-15 17:09:32"
+        "original_cost": 1580,
+        "dynamic_cost": 1580,
+        "total_amount": 158000,
+        "latest_price": 1600,
+        "market_value": 160000,
+        "floating_profit": 2000,
+        "floating_profit_ratio": 0.0127,
+        "created_at": "2024-02-01 10:35:00",
+        "updated_at": "2024-02-01 10:40:00"
     }
 }
 ```

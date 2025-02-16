@@ -1411,6 +1411,16 @@
             setButtonLoading(updateBtn, false);
         }
     }
+
+    // 显示执行策略模态框
+    function showExecuteStrategyModal(strategyId) {
+        // 重置表单
+        document.getElementById('executeStrategyForm').reset();
+        // 设置策略ID
+        document.getElementById('executeStrategyId').value = strategyId;
+        // 显示模态框
+        executeStrategyModal.show();
+    }
 </script>
 </body>
 </html> 
