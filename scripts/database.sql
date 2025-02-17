@@ -77,12 +77,12 @@ CREATE TABLE IF NOT EXISTS stock_positions (
 INSERT INTO stock_strategies (
     stock_name, stock_code, action, position_ratio,
     price_min, price_max, take_profit_price, stop_loss_price,
-    other_conditions, reason,
+    other_conditions, reason, execution_status,
     created_at, updated_at
 ) VALUES (
-    '贵州茅台', '600519', 'buy', 0.1,
-    1500, 1600, 1700, 1450,
-    '日线MACD金叉', '技术面向好，估值合理',
+    '掌趣科技', '300315', 'buy', 0.2,
+    5.9, 6.0, 5.5, 7.1,
+    '日线MACD金叉', '技术面向好，估值合理', 'completed',
     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
@@ -91,13 +91,13 @@ INSERT INTO strategy_executions (
     execution_price, volume, execution_result, remarks,
     execution_time, created_at, updated_at
 ) VALUES (
-    1, '600519', '贵州茅台', 'buy',
-    1550, 100, 'success', '按计划执行完成',
+    1, '300315', '掌趣科技', 'buy',
+    5.804, 10100, 'success', '按计划执行完成',
     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO stock_positions (
     stock_code, stock_name, total_volume, original_cost, dynamic_cost, total_amount
 ) VALUES (
-    '600519', '贵州茅台', 100, 1550.5, 1550.5, 155050
+    '300315', '掌趣科技', 10100, 5.804, 5.804, 58620.4
 ); 
