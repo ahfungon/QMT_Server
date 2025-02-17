@@ -5,7 +5,22 @@
 """
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from app import create_app
+
+# 获取项目根目录
+ROOT_DIR = Path(__file__).resolve().parent
+env_path = ROOT_DIR / '.env'
+
+# 加载环境变量
+print(f"\n=== 加载环境变量 ===")
+print(f"尝试加载环境变量文件：{env_path}")
+if env_path.exists():
+    load_dotenv(env_path, override=True)
+    print("环境变量加载成功！")
+else:
+    print("警告：找不到 .env 文件！")
 
 app = create_app()
 

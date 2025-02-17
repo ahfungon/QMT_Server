@@ -60,13 +60,10 @@ def create_app(config_name=None):
     with app.app_context():
         try:
             # 尝试创建数据库（如果不存在）
-            database_name = os.getenv('MYSQL_DATABASE')
+            database_name = app.config['SQLALCHEMY_DATABASE_URI'].split('/')[-1].split('?')[0]
             
             # 创建到 MySQL 服务器的连接（不指定数据库）
-            base_url = (
-                f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
-                f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/"
-            )
+            base_url = app.config['SQLALCHEMY_DATABASE_URI'].rsplit('/', 1)[0]
             engine_without_db = db.create_engine(base_url)
             
             # 检查数据库是否存在

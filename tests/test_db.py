@@ -9,9 +9,36 @@ import pymysql
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+# 获取项目根目录
+ROOT_DIR = Path(__file__).resolve().parent.parent
+env_path = ROOT_DIR / '.env'
+
 # 加载环境变量
-env_path = Path(__file__).parent / '.env'
-load_dotenv(env_path, override=True)
+print(f"\n=== 加载环境变量 ===")
+print(f"尝试加载环境变量文件：{env_path}")
+if env_path.exists():
+    load_dotenv(env_path, override=True)
+    print("环境变量加载成功！")
+else:
+    print("警告：找不到 .env 文件！")
+
+# 打印所有当前环境变量
+print("\n=== 当前所有环境变量 ===")
+for key, value in os.environ.items():
+    if 'MYSQL' in key:
+        print(f"{key}: {value}")
+
+# 在加载环境变量之后添加
+print(f"\n=== 文件路径信息 ===")
+print(f"当前文件: {__file__}")
+print(f"当前目录: {os.getcwd()}")
+print(f"环境变量文件路径: {env_path}")
+print(f"环境变量文件是否存在: {env_path.exists()}")
+
+if env_path.exists():
+    print("\n=== 环境变量文件内容 ===")
+    with open(env_path, 'r', encoding='utf-8') as f:
+        print(f.read())
 
 def test_pymysql_connection():
     """测试 PyMySQL 直接连接"""
@@ -24,7 +51,12 @@ def test_pymysql_connection():
         password = os.getenv('MYSQL_PASSWORD')
         database = os.getenv('MYSQL_DATABASE')
         
-        print(f"连接信息: host={host}, port={port}, user={user}, database={database}")
+        print(f"连接信息:")
+        print(f"- HOST: {host}")
+        print(f"- PORT: {port}")
+        print(f"- USER: {user}")
+        print(f"- DATABASE: {database}")
+        print(f"- PASSWORD: {'*' * len(str(password)) if password else 'None'}")
         
         # 创建连接
         conn = pymysql.connect(
@@ -53,6 +85,10 @@ def test_pymysql_connection():
         
     except pymysql.Error as e:
         print(f"PyMySQL 连接失败: {str(e)}")
+        # 打印更详细的错误信息
+        import traceback
+        print("\n=== 详细错误信息 ===")
+        print(traceback.format_exc())
 
 def test_sqlalchemy_connection():
     """测试 SQLAlchemy 连接"""
