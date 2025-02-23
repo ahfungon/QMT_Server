@@ -4,6 +4,24 @@ CREATE DATABASE IF NOT EXISTS stock_strategy DEFAULT CHARACTER SET utf8mb4 COLLA
 -- 使用数据库
 USE stock_strategy;
 
+-- 创建账户资金表
+CREATE TABLE IF NOT EXISTS account_funds (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '账户ID',
+    initial_assets DECIMAL(12,2) NOT NULL DEFAULT 300000.00 COMMENT '初始资金',
+    total_assets DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '资产总值',
+    available_funds DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '可用资金',
+    frozen_funds DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '冻结资金',
+    total_profit DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '总盈亏',
+    total_profit_ratio DECIMAL(10,4) NOT NULL DEFAULT 0 COMMENT '总收益率',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_updated_at (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账户资金表';
+
+-- 插入初始资金记录（30万）
+INSERT INTO account_funds (initial_assets, total_assets, available_funds, frozen_funds, total_profit, total_profit_ratio)
+VALUES (300000.00, 300000.00, 300000.00, 0.00, 0.00, 0.00);
+
 -- 创建股票策略表
 CREATE TABLE IF NOT EXISTS stock_strategies (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '策略ID',
@@ -18,9 +36,9 @@ CREATE TABLE IF NOT EXISTS stock_strategies (
     other_conditions TEXT NULL COMMENT '其他操作条件',
     reason TEXT NULL COMMENT '操作理由',
     execution_status ENUM('pending', 'completed', 'partial') NOT NULL DEFAULT 'pending' COMMENT '执行状态：未执行、已全部执行、已部分执行',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '策略是否有效',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '策略制定时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '策略修正时间',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '策略是否有效',
     INDEX idx_stock_code (stock_code),
     INDEX idx_created_at (created_at),
     INDEX idx_updated_at (updated_at),
@@ -77,12 +95,12 @@ CREATE TABLE IF NOT EXISTS stock_positions (
 INSERT INTO stock_strategies (
     stock_name, stock_code, action, position_ratio,
     price_min, price_max, take_profit_price, stop_loss_price,
-    other_conditions, reason, execution_status,
+    other_conditions, reason, execution_status, is_active,
     created_at, updated_at
 ) VALUES (
     '掌趣科技', '300315', 'buy', 0.2,
-    5.9, 6.0, 5.5, 7.1,
-    '日线MACD金叉', '技术面向好，估值合理', 'completed',
+    5.9, 6.0, 7.5, 5.1,
+    '日线MACD金叉', '技术面向好，估值合理', 'completed', FALSE,
     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
@@ -97,7 +115,19 @@ INSERT INTO strategy_executions (
 );
 
 INSERT INTO stock_positions (
-    stock_code, stock_name, total_volume, original_cost, dynamic_cost, total_amount
+    stock_code, stock_name, total_volume, original_cost, dynamic_cost, total_amount,
+    latest_price, market_value, floating_profit, floating_profit_ratio
 ) VALUES (
-    '300315', '掌趣科技', 10100, 5.804, 5.804, 58620.4
-); 
+    '300315', '掌趣科技', 10100, 5.804, 5.804, 58620.4,
+    5.804, 58620.4, 0, 0
+);
+
+-- 4. 更新账户资金（扣除买入金额）
+UPDATE account_funds 
+SET 
+    available_funds = available_funds - 58620.4,
+    total_assets = available_funds + frozen_funds + 58620.4,
+    total_profit = total_assets - initial_assets,
+    total_profit_ratio = ((total_assets - initial_assets) / initial_assets) * 100,
+    updated_at = CURRENT_TIMESTAMP 
+WHERE id = 1; 

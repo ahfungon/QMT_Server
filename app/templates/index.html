@@ -252,7 +252,7 @@
 </head>
 <body>
     <div class="container py-4">
-        <h1 class="text-center mb-4">股票交易策略管理</h1>
+        <h1 class="text-center mb-4">AI-Stock</h1>
         
         <!-- 导航标签 -->
         <ul class="nav nav-tabs" role="tablist">
@@ -288,6 +288,35 @@
 
                 <!-- 持仓列表 -->
                 <div id="positionsList" class="row">
+                    <!-- 资金信息面板 -->
+                    <div class="fund-info-panel mb-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">可用资金</h5>
+                                        <p class="card-text" id="availableFunds">¥ 0.00</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">资产总值</h5>
+                                        <p class="card-text" id="totalAssets">¥ 0.00</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">总收益率</h5>
+                                        <p class="card-text" id="totalProfitRatio">0.00%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="position-table-container">
                         <table class="position-table">
                             <thead>
@@ -298,10 +327,10 @@
                                     <th>原始成本</th>
                                     <th>动态成本</th>
                                     <th>最新价格</th>
+                                    <th>持仓成本</th>
                                     <th>持仓市值</th>
                                     <th>浮动盈亏</th>
                                     <th>盈亏比例</th>
-                                    <th>更新时间</th>
                                 </tr>
                             </thead>
                             <tbody id="positionsTableBody">
@@ -1125,194 +1154,124 @@
         });
     }
 
-    // 刷新持仓列表
-    async function refreshPositions() {
+    // 添加资金信息更新函数
+    async function updateFundInfo() {
         try {
-            const response = await axios.get('/api/v1/positions');
-            
-            if (response.data.code === 200) {
-                displayPositions(response.data.data);
-                // 更新最后更新时间
-                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString();
-            } else {
-                showToast('error', '获取持仓列表失败：' + response.data.message);
+            const response = await fetch('/api/v1/account/funds');
+            const data = await response.json();
+            if (data.code === 200) {
+                document.getElementById('availableFunds').textContent = formatMoney(data.data.available_funds);
+                document.getElementById('totalAssets').textContent = formatMoney(data.data.total_assets);
+                const profitRatioElement = document.getElementById('totalProfitRatio');
+                const profitRatio = data.data.total_profit_ratio;
+                profitRatioElement.textContent = formatProfitRatio(profitRatio);
+                profitRatioElement.className = 'card-text ' + (profitRatio >= 0 ? 'profit' : 'loss');
             }
         } catch (error) {
-            console.error('获取持仓列表失败：', error);
-            showToast('error', '获取持仓列表失败，请查看控制台了解详情');
+            console.error('获取资金信息失败:', error);
         }
     }
 
-    // 显示持仓列表
-    function displayPositions(positions) {
-        const tbody = document.getElementById('positionsTableBody');
+    // 格式化金额显示
+    function formatMoney(amount) {
+        return '¥ ' + parseFloat(amount).toLocaleString('zh-CN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // 格式化盈亏比例
+    function formatProfitRatio(ratio) {
+        if (ratio === 999999) return '♾️';
+        return ratio.toFixed(2) + '%';
+    }
+
+    // 更新持仓列表函数
+    async function updatePositionsList(positions) {
+        const table = document.querySelector('.position-table');
+        const tbody = table.querySelector('tbody') || document.createElement('tbody');
         tbody.innerHTML = '';
-        
-        if (!positions || positions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center">暂无持仓数据</td></tr>';
-            return;
-        }
-        
-        let totalVolume = 0;
+
         let totalMarketValue = 0;
         let totalFloatingProfit = 0;
-        let totalDynamicCostValue = 0;
+        let totalCost = 0;
+        let totalVolume = 0;
 
         positions.forEach(position => {
-            const tr = document.createElement('tr');
-            
-            // 计算动态成本总值
-            const dynamicCostValue = position.total_volume * position.dynamic_cost;
-            totalDynamicCostValue += dynamicCostValue;
-            
-            // 累加其他总计数据
-            totalVolume += position.total_volume;
-            totalMarketValue += position.market_value;
-            totalFloatingProfit += position.floating_profit;
-
-            // 计算单个股票的盈亏比例
-            let profitRatio;
-            if (position.dynamic_cost <= 0) {
-                profitRatio = Infinity;  // 当动态成本小于等于0时，设置为无穷大
-            } else {
-                profitRatio = position.floating_profit_ratio;
-            }
-
-            tr.innerHTML = `
+            const row = document.createElement('tr');
+            row.innerHTML = `
                 <td>${position.stock_name}</td>
                 <td>${position.stock_code}</td>
-                <td class="number">${position.total_volume.toLocaleString()}</td>
-                <td class="number">${position.original_cost.toFixed(2)}</td>
-                <td class="number">${position.dynamic_cost.toFixed(2)}</td>
-                <td class="number">${position.latest_price.toFixed(2)}</td>
-                <td class="number">${position.market_value.toLocaleString()}</td>
-                <td class="number ${position.floating_profit >= 0 ? 'profit' : 'loss'}">${position.floating_profit.toLocaleString()}</td>
-                <td class="number ${position.floating_profit >= 0 ? 'profit' : 'loss'}">${formatPercent(profitRatio)}</td>
-                <td class="position-time">${position.updated_at}</td>
+                <td class="text-end">${position.total_volume}</td>
+                <td class="text-end">${formatMoney(position.original_cost)}</td>
+                <td class="text-end">${formatMoney(position.dynamic_cost)}</td>
+                <td class="text-end">${formatMoney(position.latest_price)}</td>
+                <td class="text-end">${formatMoney(position.total_volume * position.dynamic_cost)}</td>
+                <td class="text-end">${formatMoney(position.market_value)}</td>
+                <td class="text-end ${position.floating_profit >= 0 ? 'profit' : 'loss'}">${formatMoney(position.floating_profit)}</td>
+                <td class="text-end ${position.floating_profit_ratio >= 0 ? 'profit' : 'loss'}">${formatProfitRatio(position.floating_profit_ratio)}</td>
             `;
-            tbody.appendChild(tr);
-        });
-        
-        // 添加合计行
-        const totalTr = document.createElement('tr');
-        totalTr.className = 'position-total';
-        
-        // 计算总的盈亏比例
-        let totalProfitRatio;
-        if (totalDynamicCostValue <= 0) {
-            totalProfitRatio = Infinity;  // 当总动态成本小于等于0时，设置为无穷大
-        } else {
-            totalProfitRatio = totalFloatingProfit / totalDynamicCostValue;
-        }
+            tbody.appendChild(row);
 
-        totalTr.innerHTML = `
-            <td>合计</td>
-            <td>-</td>
-            <td class="number">${totalVolume.toLocaleString()}</td>
-            <td class="number">-</td>
-            <td class="number">-</td>
-            <td class="number">-</td>
-            <td class="number">${totalMarketValue.toLocaleString()}</td>
-            <td class="number ${totalFloatingProfit >= 0 ? 'profit' : 'loss'}">${totalFloatingProfit.toLocaleString()}</td>
-            <td class="number ${totalFloatingProfit >= 0 ? 'profit' : 'loss'}">${formatPercent(totalProfitRatio)}</td>
-            <td>-</td>
+            // 累计合计数据
+            totalMarketValue += parseFloat(position.market_value) || 0;
+            totalFloatingProfit += parseFloat(position.floating_profit) || 0;
+            totalCost += position.total_volume * position.dynamic_cost;
+            totalVolume += position.total_volume;
+        });
+
+        // 计算合计行收益率
+        const totalProfitRatio = totalCost > 0 ? (totalFloatingProfit / totalCost) * 100 : 0;
+
+        // 添加合计行
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'total-row';
+        totalRow.innerHTML = `
+            <td colspan="2" class="text-center">合计</td>
+            <td class="text-end">${totalVolume}</td>
+            <td class="text-end">-</td>
+            <td class="text-end">-</td>
+            <td class="text-end">-</td>
+            <td class="text-end">${formatMoney(totalCost)}</td>
+            <td class="text-end">${formatMoney(totalMarketValue)}</td>
+            <td class="text-end ${totalFloatingProfit >= 0 ? 'profit' : 'loss'}">${formatMoney(totalFloatingProfit)}</td>
+            <td class="text-end ${totalProfitRatio >= 0 ? 'profit' : 'loss'}">${formatProfitRatio(totalProfitRatio)}</td>
         `;
-        tbody.appendChild(totalTr);
+        tbody.appendChild(totalRow);
+
+        if (!table.contains(tbody)) {
+            table.appendChild(tbody);
+        }
 
         // 更新最后更新时间
-        if (positions.length > 0) {
-            document.getElementById('lastUpdateTime').textContent = 
-                `最后更新时间：${positions[0].updated_at}`;
-        }
-    }
-
-    // 格式化数字为带千分位的字符串
-    function formatNumber(num, decimals = 2) {
-        if (num === null || num === undefined) return '-';
-        return num.toLocaleString('zh-CN', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        });
-    }
-
-    // 格式化百分比
-    function formatPercent(num) {
-        if (num === null || num === undefined) return '-';
-        if (!isFinite(num)) return '♾️';
-        return (num * 100).toFixed(2) + '%';
-    }
-
-    // 更新持仓表格
-    function updatePositionsTable(positions) {
-        const tbody = document.getElementById('positionsTableBody');
-        tbody.innerHTML = '';  // 清空表格内容
+        document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-CN');
         
-        let totalVolume = 0;
-        let totalMarketValue = 0;
-        let totalFloatingProfit = 0;
-        let totalDynamicCostValue = 0;
-        
-        positions.forEach(position => {
-            const tr = document.createElement('tr');
-            
-            // 计算动态成本总值
-            const dynamicCostValue = position.total_volume * position.dynamic_cost;
-            totalDynamicCostValue += dynamicCostValue;
-            
-            // 累加其他总计数据
-            totalVolume += position.total_volume;
-            totalMarketValue += position.market_value;
-            totalFloatingProfit += position.floating_profit;
+        // 更新资金信息
+        await updateFundInfo();
+    }
 
-            // 计算单个股票的盈亏比例
-            let profitRatio;
-            if (position.dynamic_cost <= 0) {
-                profitRatio = Infinity;  // 当动态成本小于等于0时，设置为无穷大
-            } else {
-                profitRatio = position.floating_profit_ratio;
+    // 刷新持仓列表时同时更新资金信息
+    async function refreshPositions() {
+        const button = document.querySelector('button.btn-outline-primary');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 刷新中...';
+        
+        try {
+            const response = await fetch('/api/v1/positions');
+            const data = await response.json();
+            if (data.code === 200) {
+                await updatePositionsList(data.data);
             }
-
-            tr.innerHTML = `
-                <td>${position.stock_name}</td>
-                <td>${position.stock_code}</td>
-                <td class="number">${position.total_volume.toLocaleString()}</td>
-                <td class="number">${position.original_cost.toFixed(2)}</td>
-                <td class="number">${position.dynamic_cost.toFixed(2)}</td>
-                <td class="number">${position.latest_price.toFixed(2)}</td>
-                <td class="number">${position.market_value.toLocaleString()}</td>
-                <td class="number ${position.floating_profit >= 0 ? 'profit' : 'loss'}">${position.floating_profit.toLocaleString()}</td>
-                <td class="number ${position.floating_profit >= 0 ? 'profit' : 'loss'}">${formatPercent(profitRatio)}</td>
-                <td class="position-time">${position.updated_at}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-        
-        // 添加合计行
-        const totalTr = document.createElement('tr');
-        totalTr.className = 'position-total';
-        
-        // 计算总的盈亏比例
-        let totalProfitRatio;
-        if (totalDynamicCostValue <= 0) {
-            totalProfitRatio = Infinity;  // 当总动态成本小于等于0时，设置为无穷大
-        } else {
-            totalProfitRatio = totalFloatingProfit / totalDynamicCostValue;
+        } catch (error) {
+            console.error('刷新持仓失败:', error);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新持仓';
         }
-
-        totalTr.innerHTML = `
-            <td>合计</td>
-            <td>-</td>
-            <td class="number">${totalVolume.toLocaleString()}</td>
-            <td class="number">-</td>
-            <td class="number">-</td>
-            <td class="number">-</td>
-            <td class="number">-</td>
-            <td class="number ${totalFloatingProfit >= 0 ? 'profit' : 'loss'}">${totalFloatingProfit.toLocaleString()}</td>
-            <td class="number ${totalFloatingProfit >= 0 ? 'profit' : 'loss'}">${formatPercent(totalProfitRatio)}</td>
-            <td>-</td>
-        `;
-        tbody.appendChild(totalTr);
     }
+
+    // 页面加载完成后自动刷新持仓
+    document.addEventListener('DOMContentLoaded', refreshPositions);
 
     // 按钮加载状态控制
     function setButtonLoading(button, isLoading) {

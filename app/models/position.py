@@ -127,12 +127,14 @@ class StockPosition(db.Model):
         """
         self.latest_price = latest_price
         self.market_value = self.total_volume * latest_price
-        # 使用动态成本计算浮动盈亏
-        self.floating_profit = self.market_value - (self.total_volume * self.dynamic_cost)
+        # 计算持仓成本
+        holding_cost = self.total_volume * self.dynamic_cost
+        # 计算浮动盈亏
+        self.floating_profit = self.market_value - holding_cost
         
-        # 当动态成本小于等于0时，浮动盈亏比例设为一个足够大的数字
-        if self.total_volume > 0 and self.dynamic_cost <= 0:
+        # 当持仓成本小于等于0时，浮动盈亏比例设为一个足够大的数字
+        if self.total_volume > 0 and holding_cost <= 0:
             self.floating_profit_ratio = 999999
         else:
             # 正常情况下计算浮动盈亏比例
-            self.floating_profit_ratio = (self.floating_profit / (self.total_volume * self.dynamic_cost)) if self.total_volume > 0 and self.dynamic_cost > 0 else 0 
+            self.floating_profit_ratio = (self.floating_profit / holding_cost) * 100 if self.total_volume > 0 and holding_cost > 0 else 0 

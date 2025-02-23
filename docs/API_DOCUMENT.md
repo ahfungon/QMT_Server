@@ -547,4 +547,130 @@
     "message": "卖出数量 200 超过持仓数量 100",
     "data": null
   }
-  ``` 
+  ```
+
+## 1. 账户资金接口
+
+### 1.1 获取账户资金信息
+- **接口**：`GET /api/v1/account/funds`
+- **描述**：获取账户的资金信息，包括总资产、可用资金、冻结资金、总盈亏和收益率
+- **参数**：无
+- **返回示例**：
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "id": 1,
+        "initial_assets": 300000.00,
+        "total_assets": 300000.00,
+        "available_funds": 241379.60,
+        "frozen_funds": 0.00,
+        "total_profit": 0.00,
+        "total_profit_ratio": 0.00,
+        "created_at": "2024-02-15 10:00:00",
+        "updated_at": "2024-02-15 10:30:00"
+    }
+}
+```
+
+### 1.2 冻结资金
+- **接口**：`POST /api/v1/account/funds/freeze`
+- **描述**：冻结指定金额的资金
+- **参数**：
+```json
+{
+    "amount": 50000.00  // 要冻结的金额
+}
+```
+- **返回示例**：
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "id": 1,
+        "initial_assets": 300000.00,
+        "total_assets": 300000.00,
+        "available_funds": 191379.60,
+        "frozen_funds": 50000.00,
+        "total_profit": 0.00,
+        "total_profit_ratio": 0.00,
+        "created_at": "2024-02-15 10:00:00",
+        "updated_at": "2024-02-15 10:35:00"
+    }
+}
+```
+
+### 1.3 解冻资金
+- **接口**：`POST /api/v1/account/funds/unfreeze`
+- **描述**：解冻指定金额的资金
+- **参数**：
+```json
+{
+    "amount": 50000.00  // 要解冻的金额
+}
+```
+- **返回示例**：
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "id": 1,
+        "initial_assets": 300000.00,
+        "total_assets": 300000.00,
+        "available_funds": 241379.60,
+        "frozen_funds": 0.00,
+        "total_profit": 0.00,
+        "total_profit_ratio": 0.00,
+        "created_at": "2024-02-15 10:00:00",
+        "updated_at": "2024-02-15 10:40:00"
+    }
+}
+```
+
+### 1.4 更新账户资金
+- **接口**：`PUT /api/v1/account/funds`
+- **描述**：更新账户的可用资金和冻结资金
+- **参数**：
+```json
+{
+    "available_funds": 241379.60,  // 可用资金
+    "frozen_funds": 0.00          // 冻结资金
+}
+```
+- **返回示例**：
+```json
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "id": 1,
+        "initial_assets": 300000.00,
+        "total_assets": 300000.00,
+        "available_funds": 241379.60,
+        "frozen_funds": 0.00,
+        "total_profit": 0.00,
+        "total_profit_ratio": 0.00,
+        "created_at": "2024-02-15 10:00:00",
+        "updated_at": "2024-02-15 10:45:00"
+    }
+}
+```
+
+### 1.5 错误码说明
+| 错误码 | 说明 |
+|--------|------|
+| 200 | 成功 |
+| 400 | 参数错误 |
+| 500 | 服务器内部错误 |
+
+### 1.6 注意事项
+1. 所有金额相关的字段都使用浮点数表示
+2. 冻结资金时会自动从可用资金中扣除
+3. 解冻资金时会自动加到可用资金中
+4. 总资产会自动计算：可用资金 + 冻结资金 + 持仓市值
+5. 总盈亏 = 总资产 - 初始资金
+6. 总收益率 = (总资产 - 初始资金) / 初始资金 * 100%
+7. 时间字段使用北京时间，格式为 "YYYY-MM-DD HH:mm:ss" 

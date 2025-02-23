@@ -9,6 +9,7 @@ import requests
 from typing import List, Dict, Any, Optional
 from ..models import db
 from ..models.position import StockPosition
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +130,18 @@ class PositionService:
         """
         try:
             positions = StockPosition.query.all()
+            
             for position in positions:
                 latest_price = self.get_real_time_price(position.stock_code)
                 if latest_price:
+                    # 测试用：对实际价格添加 0.8-1.3 的随机波动
+                    # fluctuation = random.uniform(0.8, 1.3)
+                    # modified_price = latest_price * fluctuation
+                    # logger.info(f"股票 {position.stock_code} 原始价格: {latest_price}, 测试波动后价格: {modified_price}")
+                    # 测试结束，注释掉以上三行代码即可
+                    # position.update_market_value(modified_price)
                     position.update_market_value(latest_price)
+
             
             db.session.commit()
             return [position.to_dict() for position in positions]
