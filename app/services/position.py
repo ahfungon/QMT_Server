@@ -27,9 +27,19 @@ class PositionService:
             Optional[float]: 股票最新价格，如果获取失败则返回 None
         """
         try:
-            # 判断股票市场（上海/深圳）
-            market = "sh" if stock_code.startswith(('6', '9')) else "sz"
-            full_code = f"{market}{stock_code}"
+            # 处理港股代码
+            if len(stock_code) == 4 and stock_code.isdigit():
+                stock_code = f"hk0{stock_code}"
+            elif len(stock_code) == 5 and stock_code.startswith('0') and stock_code[1:].isdigit():
+                stock_code = f"hk{stock_code}"
+            
+            # 判断股票市场
+            if stock_code.startswith('hk'):
+                market = "hk"
+                full_code = stock_code
+            else:
+                market = "sh" if stock_code.startswith(('6', '9')) else "sz"
+                full_code = f"{market}{stock_code}"
             
             # 设置通用请求头
             headers = {
@@ -57,7 +67,7 @@ class PositionService:
                 if 'FAILED' not in content:
                     data = content.split('=')[1].strip('"').split(',')
                     if len(data) > 3:
-                        latest_price = float(data[3])  # 当前价格在第4个位置
+                        latest_price = float(data[6] if market == "hk" else data[3])  # 港股价格在第7个位置
                         if latest_price > 0:  # 确保价格有效
                             logger.info(f"从新浪获取到股票 {stock_code} 的最新价格: {latest_price}")
                             return latest_price
@@ -90,9 +100,9 @@ class PositionService:
                 'Referer': 'https://quote.eastmoney.com'
             })
             
-            market_id = '1' if market == 'sh' else '0'
+            market_id = '1' if market == 'sh' else ('0' if market == 'sz' else '116')  # 港股市场ID为116
             response = requests.get(
-                f"https://push2.eastmoney.com/api/qt/stock/get?secid={market_id}.{stock_code}&fields=f43",
+                f"https://push2.eastmoney.com/api/qt/stock/get?secid={market_id}.{stock_code.replace('hk', '')}",
                 headers=eastmoney_headers,
                 timeout=5
             )
