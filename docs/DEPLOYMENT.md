@@ -18,183 +18,206 @@
 
 # 部署文档
 
-## 1. 环境要求
+## 系统要求
 
 - Python 3.10+
 - MySQL 8.0+
-- Git
-- 推荐使用 PyCharm 或 VSCode 作为开发工具
+- 操作系统：Linux/macOS/Windows
 
-## 2. 安装步骤
+## 环境准备
 
-### 2.1 克隆代码
+### 1. 安装 Python 依赖
+
 ```bash
-git clone https://github.com/your-username/QMT_Server.git
-cd QMT_Server
-```
-
-### 2.2 创建虚拟环境
-```bash
+# 创建虚拟环境
 python -m venv venv
+
+# 激活虚拟环境
+# Linux/macOS
+source venv/bin/activate
 # Windows
 venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-```
 
-### 2.3 安装依赖
-```bash
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2.4 配置环境变量
-复制 `.env.example` 为 `.env`，并修改相关配置：
-```ini
-# 数据库配置
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=qmt_server
-DB_USER=your_username
-DB_PASSWORD=your_password
+### 2. 配置数据库
 
-# AI配置
-ZHIPU_API_KEY=your_zhipu_api_key
-DEEPSEEK_API_KEY=your_deepseek_api_key
-
-# 应用配置
-FLASK_APP=app.py
-FLASK_ENV=development
-FLASK_DEBUG=1
-```
-
-### 2.5 初始化数据库
 ```bash
 # 创建数据库
 mysql -u root -p
-CREATE DATABASE qmt_server CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
-# 初始化表结构
+```sql
+CREATE DATABASE stock_strategy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'qmt_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON stock_strategy.* TO 'qmt_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### 3. 配置环境变量
+
+创建 `.env` 文件，配置以下环境变量：
+
+```
+# 数据库配置
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=stock_strategy
+DB_USER=qmt_user
+DB_PASSWORD=your_password
+
+# 应用配置
+FLASK_APP=app.py
+FLASK_ENV=production
+SECRET_KEY=your_secret_key
+
+# 智谱AI配置
+ZHIPU_API_KEY=your_zhipu_api_key
+
+# DeepSeek AI配置
+DEEPSEEK_API_KEY=your_deepseek_api_key
+```
+
+## 数据库初始化
+
+### 1. 初始化数据库
+
+```bash
+# 初始化数据库
 python scripts/init_db.py
 ```
 
-## 3. 启动服务
-
-### 3.1 开发环境
-```bash
-flask run
-```
-
-### 3.2 生产环境
-使用 gunicorn 或 uwsgi 作为 WSGI 服务器：
+### 2. 生成测试数据（可选）
 
 ```bash
-# 使用 gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-
-# 使用 uwsgi
-uwsgi --ini uwsgi.ini
+# 生成测试数据
+python scripts/test_data.py
 ```
 
-## 4. 配置说明
+### 3. 数据库迁移
 
-### 4.1 数据库配置
-在 `config/settings.py` 中配置数据库连接：
-```python
-SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-SQLALCHEMY_ECHO = True if FLASK_ENV == 'development' else False
+当需要更新数据库结构时，可以使用以下两种方式之一：
+
+#### 方式一：使用 Python 脚本（推荐）
+
+```bash
+# 更新数据库以支持新的操作类型
+python scripts/update_db_for_new_actions.py
 ```
 
-### 4.2 AI配置
-在 `config/settings.py` 中配置 AI 服务：
-```python
-ZHIPU_API_KEY = os.getenv('ZHIPU_API_KEY')
-ZHIPU_API_URL = "https://api.zhipu.ai/v1/chat/completions"
+#### 方式二：直接执行 SQL 脚本
 
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+```bash
+# 使用 MySQL 客户端执行更新脚本
+mysql -u qmt_user -p < scripts/update_db_schema.sql
 ```
 
-### 4.3 日志配置
-在 `config/settings.py` 中配置日志：
-```python
-LOG_LEVEL = 'DEBUG' if FLASK_ENV == 'development' else 'INFO'
-LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-LOG_FILE = 'logs/app.log'
+**注意**：如果您是首次安装系统，则不需要执行上述迁移步骤，因为初始化数据库时已经包含了最新的结构。
+
+## 应用部署
+
+### 方式一：直接运行
+
+```bash
+# 启动应用
+python run.py
 ```
 
-## 5. 部署架构
+### 方式二：使用 Gunicorn（推荐用于生产环境）
 
-```mermaid
-graph TD
-    Client[客户端] --> Nginx[Nginx反向代理]
-    Nginx --> App[Flask应用]
-    App --> MySQL[MySQL数据库]
-    App --> ZhipuAI[智谱AI]
-    App --> DeepseekAI[DeepSeek AI]
+```bash
+# 安装 Gunicorn
+pip install gunicorn
+
+# 启动应用
+gunicorn -w 4 -b 0.0.0.0:5000 run:app
 ```
 
-## 6. 监控和维护
+### 方式三：使用 Docker
 
-### 6.1 日志监控
-- 应用日志：`logs/app.log`
-- 错误日志：`logs/error.log`
-- 访问日志：`logs/access.log`
+```bash
+# 构建镜像
+docker build -t qmt-server .
 
-### 6.2 数据库备份
+# 运行容器
+docker run -d -p 5000:5000 --name qmt-server --env-file .env qmt-server
+```
+
+## 部署后验证
+
+访问以下接口验证部署是否成功：
+
+```
+GET http://localhost:5000/api/v1/health
+```
+
+预期返回：
+
+```json
+{
+  "code": 200,
+  "message": "服务正常运行",
+  "data": {
+    "status": "ok",
+    "version": "1.0.0",
+    "timestamp": "2023-06-01T12:00:00Z"
+  }
+}
+```
+
+## 日志管理
+
+日志文件存储在 `logs` 目录下，按日期分割：
+
+- `app.log` - 当前日志
+- `app.log.YYYY-MM-DD` - 历史日志
+
+查看日志：
+
+```bash
+# 查看最新日志
+tail -f logs/app.log
+
+# 查看错误日志
+grep ERROR logs/app.log
+```
+
+## 备份与恢复
+
+### 数据库备份
+
 ```bash
 # 备份数据库
-mysqldump -u root -p qmt_server > backup/qmt_server_$(date +%Y%m%d).sql
-
-# 恢复数据库
-mysql -u root -p qmt_server < backup/qmt_server_20240201.sql
+mysqldump -u qmt_user -p stock_strategy > backup/stock_strategy_$(date +%Y%m%d).sql
 ```
 
-### 6.3 性能监控
-使用 Prometheus + Grafana 监控系统性能：
-- CPU 使用率
-- 内存使用率
-- 磁盘使用率
-- 请求响应时间
-- 错误率
-- QPS
+### 数据库恢复
 
-## 7. 常见问题
+```bash
+# 恢复数据库
+mysql -u qmt_user -p stock_strategy < backup/stock_strategy_20230601.sql
+```
 
-### 7.1 端口占用
-如果 5000 端口被占用，请不要修改端口，而是：
-1. Windows: 使用 `netstat -ano | findstr 5000` 找到占用进程
-2. Linux: 使用 `lsof -i:5000` 找到占用进程
-3. 结束占用进程后重新启动服务
+## 常见问题
 
-### 7.2 数据库连接失败
-1. 检查数据库服务是否启动
-2. 检查数据库用户名密码是否正确
-3. 检查数据库主机和端口是否正确
-4. 检查防火墙设置
+### 1. 数据库连接失败
 
-### 7.3 AI服务调用失败
-1. 检查 API Key 是否正确
-2. 检查网络连接是否正常
-3. 检查 API 调用频率是否超限
-4. 检查 API 余额是否充足
+检查 `.env` 文件中的数据库配置是否正确，确保数据库服务正在运行。
 
-## 8. 安全配置
+### 2. API 调用失败
 
-### 8.1 数据库安全
-1. 使用强密码
-2. 限制数据库访问IP
-3. 定期更新密码
-4. 定期备份数据
+检查 `.env` 文件中的 API 密钥配置是否正确，确保网络连接正常。
 
-### 8.2 应用安全
-1. 使用 HTTPS
-2. 启用 CSRF 保护
-3. 设置合理的 Session 超时
-4. 限制 API 访问频率
+### 3. 服务无法启动
 
-### 8.3 服务器安全
-1. 及时更新系统补丁
-2. 配置防火墙规则
-3. 使用 SSH Key 登录
-4. 禁用 root 远程登录 
+检查日志文件 `logs/app.log` 中的错误信息，确保所有依赖已正确安装。
+
+## 联系支持
+
+如有任何问题，请联系技术支持团队：
+
+- 邮箱：support@example.com
+- 电话：123-456-7890 

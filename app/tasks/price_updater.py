@@ -25,8 +25,12 @@ class PriceUpdater(threading.Thread):
     AFTERNOON_END = dt_time(15, 0)   # 下午收盘时间 15:00
     
     # 定义更新间隔（秒）
-    TRADING_INTERVAL = 30      # 交易时段更新间隔：30秒
-    NON_TRADING_INTERVAL = 300 # 非交易时段更新间隔：5分钟
+    TRADING_INTERVAL = 60      # 交易时段更新间隔：60秒（原来是30秒）
+    NON_TRADING_INTERVAL = 600 # 非交易时段更新间隔：10分钟（原来是5分钟）
+    WEEKEND_INTERVAL = 1800    # 周末更新间隔：30分钟
+    
+    # 记录上次更新时间
+    _last_update_time = 0
     
     def __init__(self, app, interval: int = None):
         """
@@ -60,6 +64,16 @@ class PriceUpdater(threading.Thread):
         afternoon_session = self.AFTERNOON_START <= current_time <= self.AFTERNOON_END
         
         return morning_session or afternoon_session
+    
+    def is_weekend(self) -> bool:
+        """
+        判断当前是否为周末
+        
+        Returns:
+            bool: 是否为周末
+        """
+        now = datetime.now(CN_TIMEZONE)
+        return now.weekday() >= 5  # 5和6代表周六和周日
         
     def get_current_interval(self) -> int:
         """
@@ -71,7 +85,23 @@ class PriceUpdater(threading.Thread):
         if self.custom_interval:
             return self.custom_interval
             
+        if self.is_weekend():
+            return self.WEEKEND_INTERVAL
+            
         return self.TRADING_INTERVAL if self.is_trading_time() else self.NON_TRADING_INTERVAL
+    
+    def should_update_now(self) -> bool:
+        """
+        判断是否应该立即更新
+        
+        Returns:
+            bool: 是否应该立即更新
+        """
+        current_time = time.time()
+        interval = self.get_current_interval()
+        
+        # 如果距离上次更新的时间超过了更新间隔，则需要更新
+        return current_time - self._last_update_time >= interval
         
     def run(self):
         """运行更新任务"""
@@ -82,26 +112,37 @@ class PriceUpdater(threading.Thread):
                 # 获取当前应该使用的更新间隔
                 current_interval = self.get_current_interval()
                 is_trading = self.is_trading_time()
+                is_weekend = self.is_weekend()
                 
-                # 在应用上下文中执行更新操作
-                with self.app.app_context():
-                    position_service = PositionService()
-                    if is_trading:
-                        logger.info(f"【后端自动】开始更新所有持仓的市值信息... (当前为交易时段，更新间隔: {current_interval}秒)")
-                    else:
-                        logger.info(f"【后端自动】开始更新所有持仓的市值信息... (当前为非交易时段，更新间隔: {current_interval}秒)")
-                    
-                    # 更新所有持仓的市值信息
-                    positions = position_service.update_all_positions()
-                    if positions:
-                        logger.info(f"【后端自动】成功更新 {len(positions)} 个持仓的市值信息")
-                    else:
-                        logger.info("【后端自动】当前没有需要更新的持仓")
+                # 判断是否需要更新
+                if self.should_update_now():
+                    # 在应用上下文中执行更新操作
+                    with self.app.app_context():
+                        position_service = PositionService()
+                        if is_weekend:
+                            logger.info(f"【后端自动】开始更新所有持仓的市值信息... (当前为周末，更新间隔: {current_interval}秒)")
+                        elif is_trading:
+                            logger.info(f"【后端自动】开始更新所有持仓的市值信息... (当前为交易时段，更新间隔: {current_interval}秒)")
+                        else:
+                            logger.info(f"【后端自动】开始更新所有持仓的市值信息... (当前为非交易时段，更新间隔: {current_interval}秒)")
+                        
+                        # 更新所有持仓的市值信息
+                        positions = position_service.update_all_positions()
+                        if positions:
+                            logger.info(f"【后端自动】成功更新 {len(positions)} 个持仓的市值信息")
+                        else:
+                            logger.info("【后端自动】当前没有需要更新的持仓")
+                        
+                        # 更新上次更新时间
+                        self._last_update_time = time.time()
+                
+                # 短暂睡眠后再检查，避免CPU占用过高
+                time.sleep(5)
                         
             except Exception as e:
                 logger.error(f"【后端自动】更新市值失败: {str(e)}")
-                
-            time.sleep(current_interval)
+                # 出错后休息一段时间再重试
+                time.sleep(30)
                 
     def stop(self):
         """停止更新任务"""

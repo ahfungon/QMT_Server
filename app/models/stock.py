@@ -27,8 +27,10 @@ class StockStrategy(db.Model):
     id = db.Column(db.Integer, primary_key=True, comment='策略ID')
     stock_name = db.Column(db.String(100, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票名称')
     stock_code = db.Column(db.String(20, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票代码')
-    action = db.Column(Enum('buy', 'sell', name='action_types'), nullable=False, comment='执行动作')
+    action = db.Column(Enum('buy', 'sell', 'add', 'trim', 'hold', name='action_types'), nullable=False, comment='执行动作')
     position_ratio = db.Column(db.Float, nullable=False, comment='操作比例')
+    # 如果是减仓(trim)，需要记录原始买入仓位
+    original_position_ratio = db.Column(db.Float, nullable=True, comment='原始买入仓位比例')
     
     # 执行价位区间
     price_min = db.Column(db.Float, nullable=True, comment='最小执行价')
@@ -65,6 +67,7 @@ class StockStrategy(db.Model):
             'stock_code': self.stock_code,
             'action': self.action,
             'position_ratio': self.position_ratio,
+            'original_position_ratio': self.original_position_ratio,
             'price_min': self.price_min,
             'price_max': self.price_max,
             'take_profit_price': self.take_profit_price,

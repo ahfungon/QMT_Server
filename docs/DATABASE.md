@@ -15,8 +15,8 @@
 | id | INTEGER | 是 | 自增 | 主键 |
 | stock_name | VARCHAR(32) | 是 | - | 股票名称 |
 | stock_code | VARCHAR(16) | 是 | - | 股票代码 |
-| action | VARCHAR(8) | 是 | - | 交易动作（buy/sell） |
-| position_ratio | DECIMAL(5,4) | 是 | - | 仓位比例（0-1） |
+| action | VARCHAR(8) | 是 | - | 交易动作（buy/sell/add/trim/hold） |
+| position_ratio | DECIMAL(5,2) | 是 | - | 仓位比例（0-100，整数表示百分比） |
 | price_min | DECIMAL(10,2) | 否 | NULL | 最低价格 |
 | price_max | DECIMAL(10,2) | 否 | NULL | 最高价格 |
 | take_profit_price | DECIMAL(10,2) | 否 | NULL | 止盈价格 |
@@ -35,6 +35,13 @@
 - INDEX idx_updated_at (updated_at)
 - INDEX idx_execution_status (execution_status)
 
+#### 操作类型说明
+- `buy`: 买入/建仓 - 初始建仓操作，会创建新的持仓记录
+- `sell`: 卖出/清仓 - 减少或清空持仓的操作
+- `add`: 加仓 - 在现有持仓基础上增加的操作
+- `trim`: 减仓 - 部分减少持仓的特殊操作
+- `hold`: 持有 - 不进行实际交易，仅记录策略的操作
+
 ### 策略执行记录表（executions）
 
 #### 字段说明
@@ -44,9 +51,10 @@
 | strategy_id | INTEGER | 是 | - | 策略ID |
 | stock_code | VARCHAR(16) | 是 | - | 股票代码 |
 | stock_name | VARCHAR(32) | 是 | - | 股票名称 |
-| action | VARCHAR(8) | 是 | - | 交易动作（buy/sell） |
+| action | VARCHAR(8) | 是 | - | 交易动作（buy/sell/add/trim/hold） |
 | execution_price | DECIMAL(10,2) | 是 | - | 执行价格 |
 | volume | INTEGER | 是 | - | 交易量 |
+| position_ratio | DECIMAL(5,2) | 否 | NULL | 仓位比例（0-100，整数表示百分比） |
 | execution_time | TIMESTAMP | 是 | CURRENT_TIMESTAMP | 执行时间 |
 | execution_result | VARCHAR(16) | 是 | - | 执行结果（success/failed/partial） |
 | remarks | TEXT | 否 | NULL | 备注说明 |
@@ -59,6 +67,12 @@
 - INDEX idx_stock_code (stock_code)
 - INDEX idx_execution_time (execution_time)
 - INDEX idx_created_at (created_at)
+
+#### 交易量计算规则
+- `buy`/`add`: 根据总资产和仓位比例计算 - 交易量 = 总资产 × 仓位比例 ÷ 价格
+- `sell`: 根据当前持股量和卖出比例计算 - 交易量 = 当前持股量 × 卖出比例
+- `trim`: 根据当前持股量、原始仓位比例和目标减仓比例计算 - 交易量 = 当前持股量 × (减仓比例 ÷ 原始买入仓位比例)
+- `hold`: 交易量为 0，不进行实际交易
 
 ### 持仓表（positions）
 
@@ -76,6 +90,7 @@
 | market_value | DECIMAL(12,2) | 是 | 0 | 市值 |
 | floating_profit | DECIMAL(12,2) | 是 | 0 | 浮动盈亏 |
 | floating_profit_ratio | DECIMAL(10,4) | 是 | 0 | 盈亏比例 |
+| original_position_ratio | DECIMAL(5,2) | 否 | NULL | 原始仓位比例（0-100，整数表示百分比） |
 | created_at | TIMESTAMP | 是 | CURRENT_TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 是 | CURRENT_TIMESTAMP | 更新时间 |
 
@@ -94,6 +109,13 @@
 2. **卖出限制**
    - 卖出数量不能超过当前持仓量
    - 违反限制时会抛出业务异常
+
+3. **持仓更新规则**
+   - `buy`: 创建新的持仓记录，记录原始仓位比例
+   - `add`: 增加持仓数量并更新平均成本
+   - `sell`: 减少持仓数量，如果卖出全部则删除持仓记录
+   - `trim`: 减少持仓数量，但保持平均成本不变
+   - `hold`: 不影响持仓记录
 
 ## 数据库关系图
 ```mermaid
@@ -124,6 +146,7 @@ erDiagram
         string action
         decimal execution_price
         int volume
+        decimal position_ratio
         timestamp execution_time
         string execution_result
         text remarks
@@ -142,6 +165,7 @@ erDiagram
         decimal market_value
         decimal floating_profit
         decimal floating_profit_ratio
+        decimal original_position_ratio
         timestamp created_at
         timestamp updated_at
     }

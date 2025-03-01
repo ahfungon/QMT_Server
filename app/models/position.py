@@ -37,6 +37,7 @@ class StockPosition(db.Model):
     market_value = db.Column(db.Float, nullable=True, comment='市值')
     floating_profit = db.Column(db.Float, nullable=True, comment='浮动盈亏')
     floating_profit_ratio = db.Column(db.Float, nullable=True, comment='浮动盈亏比例')
+    original_position_ratio = db.Column(db.Float, nullable=True, comment='原始买入仓位比例')
     
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), comment='创建时间')
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), onupdate=lambda: datetime.now(CN_TIMEZONE), comment='更新时间')
@@ -59,6 +60,7 @@ class StockPosition(db.Model):
             'market_value': self.market_value,
             'floating_profit': self.floating_profit,
             'floating_profit_ratio': self.floating_profit_ratio,
+            'original_position_ratio': self.original_position_ratio,
             'created_at': self.created_at.astimezone(CN_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.astimezone(CN_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')
         }

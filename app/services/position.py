@@ -6,15 +6,22 @@
 
 import logging
 import requests
+import time
 from typing import List, Dict, Any, Optional
 from ..models import db
 from ..models.position import StockPosition
 import random
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 class PositionService:
     """持仓服务类"""
+    
+    # 股票价格缓存
+    __price_cache = {}
+    # 缓存过期时间（秒）
+    CACHE_EXPIRY = 60  # 1分钟缓存
     
     def get_real_time_price(self, stock_code: str) -> Optional[float]:
         """
@@ -26,6 +33,14 @@ class PositionService:
         Returns:
             Optional[float]: 股票最新价格，如果获取失败则返回 None
         """
+        # 检查缓存
+        if stock_code in self.__price_cache:
+            cache_item = self.__price_cache[stock_code]
+            # 如果缓存未过期，返回缓存的价格
+            if time.time() - cache_item['timestamp'] < self.CACHE_EXPIRY:
+                logger.debug(f"从缓存获取股票 {stock_code} 的价格: {cache_item['price']}")
+                return cache_item['price']
+        
         try:
             # 处理港股代码
             if len(stock_code) == 4 and stock_code.isdigit():
@@ -70,6 +85,11 @@ class PositionService:
                         latest_price = float(data[6] if market == "hk" else data[3])  # 港股价格在第7个位置
                         if latest_price > 0:  # 确保价格有效
                             logger.info(f"从新浪获取到股票 {stock_code} 的最新价格: {latest_price}")
+                            # 更新缓存
+                            self.__price_cache[stock_code] = {
+                                'price': latest_price,
+                                'timestamp': time.time()
+                            }
                             return latest_price
             
             # 如果新浪接口失败，尝试腾讯接口
@@ -92,6 +112,11 @@ class PositionService:
                         latest_price = float(data[3])
                         if latest_price > 0:  # 确保价格有效
                             logger.info(f"从腾讯获取到股票 {stock_code} 的最新价格: {latest_price}")
+                            # 更新缓存
+                            self.__price_cache[stock_code] = {
+                                'price': latest_price,
+                                'timestamp': time.time()
+                            }
                             return latest_price
             
             # 如果都失败了，尝试东方财富接口
@@ -113,6 +138,11 @@ class PositionService:
                     latest_price = float(data['data']['f43']) / 100  # 东方财富的价格需要除以100
                     if latest_price > 0:
                         logger.info(f"从东方财富获取到股票 {stock_code} 的最新价格: {latest_price}")
+                        # 更新缓存
+                        self.__price_cache[stock_code] = {
+                            'price': latest_price,
+                            'timestamp': time.time()
+                        }
                         return latest_price
             
             logger.warning(f"无法从任何数据源获取股票 {stock_code} 的实时价格")
@@ -141,17 +171,20 @@ class PositionService:
         try:
             positions = StockPosition.query.all()
             
-            for position in positions:
-                latest_price = self.get_real_time_price(position.stock_code)
+            # 优化：一次性收集所有股票代码
+            stock_codes = list(set([position.stock_code for position in positions]))
+            
+            # 先获取所有价格，再更新持仓，减少API请求和数据库操作
+            price_map = {}
+            for stock_code in stock_codes:
+                latest_price = self.get_real_time_price(stock_code)
                 if latest_price:
-                    # 测试用：对实际价格添加 0.8-1.3 的随机波动
-                    # fluctuation = random.uniform(0.8, 1.3)
-                    # modified_price = latest_price * fluctuation
-                    # logger.info(f"股票 {position.stock_code} 原始价格: {latest_price}, 测试波动后价格: {modified_price}")
-                    # 测试结束，注释掉以上三行代码即可
-                    # position.update_market_value(modified_price)
-                    position.update_market_value(latest_price)
-
+                    price_map[stock_code] = latest_price
+            
+            # 更新所有持仓
+            for position in positions:
+                if position.stock_code in price_map:
+                    position.update_market_value(price_map[position.stock_code])
             
             db.session.commit()
             return [position.to_dict() for position in positions]
@@ -179,7 +212,7 @@ class PositionService:
             logger.error(f"获取持仓信息失败: {str(e)}", exc_info=True)
             raise
 
-    def update_position(self, stock_code: str, stock_name: str, volume: int, price: float, action: str) -> Dict[str, Any]:
+    def update_position(self, stock_code: str, stock_name: str, volume: int, price: float, action: str, position_ratio: float = None, original_position_ratio: float = None) -> Dict[str, Any]:
         """
         更新持仓信息
         
@@ -188,7 +221,9 @@ class PositionService:
             stock_name: 股票名称
             volume: 交易量
             price: 交易价格
-            action: 交易动作（buy/sell）
+            action: 交易动作（buy/sell/add/trim/hold）
+            position_ratio: 仓位比例
+            original_position_ratio: 原始买入仓位比例（用于trim操作）
             
         Returns:
             Dict[str, Any]: 更新后的持仓信息
@@ -196,9 +231,18 @@ class PositionService:
         try:
             # 获取或创建持仓记录
             position = StockPosition.query.filter_by(stock_code=stock_code).first()
+            
+            # 处理hold操作：不进行实际交易，仅记录策略
+            if action == 'hold':
+                if not position:
+                    logger.warning(f"股票 {stock_code} 没有持仓，不能执行hold操作")
+                    return None
+                logger.info(f"股票 {stock_code} 执行hold操作，不进行实际交易")
+                return position.to_dict() if position else None
+            
             if not position:
-                if action == 'sell':
-                    raise ValueError(f"股票 {stock_code} 没有持仓，无法卖出")
+                if action in ['sell', 'trim']:
+                    raise ValueError(f"股票 {stock_code} 没有持仓，无法执行 {action} 操作")
                 position = StockPosition(
                     stock_code=stock_code,
                     stock_name=stock_name,
@@ -208,12 +252,24 @@ class PositionService:
                 )
                 db.session.add(position)
             
-            # 检查卖出数量是否超过持仓
-            if action == 'sell' and volume > position.total_volume:
-                raise ValueError(f"卖出数量 {volume} 超过持仓数量 {position.total_volume}")
+            # 检查卖出/减仓数量是否超过持仓
+            if action in ['sell', 'trim'] and volume > position.total_volume:
+                raise ValueError(f"{action}数量 {volume} 超过持仓数量 {position.total_volume}")
             
+            # 对买入/加仓操作，记录原始仓位比例
+            if action in ['buy', 'add'] and position_ratio:
+                position.original_position_ratio = position_ratio
+                
             # 更新持仓信息
-            position.update_position(volume, price, action)
+            if action in ['buy', 'add']:
+                # 买入或加仓操作，基本逻辑相同
+                self._update_position_buy(position, volume, price)
+            elif action == 'sell':
+                # 卖出操作
+                self._update_position_sell(position, volume, price)
+            elif action == 'trim':
+                # 减仓操作
+                self._update_position_trim(position, volume, price)
             
             # 如果持仓数量为0，删除持仓记录
             if position.total_volume == 0:
@@ -229,6 +285,90 @@ class PositionService:
             db.session.rollback()
             logger.error(f"更新持仓失败: {str(e)}", exc_info=True)
             raise
+    
+    def _update_position_buy(self, position: StockPosition, volume: int, price: float):
+        """
+        处理买入/加仓操作
+        
+        Args:
+            position: 持仓对象
+            volume: 交易量
+            price: 交易价格
+        """
+        # 转换为Decimal以提高精度
+        dec_price = Decimal(str(price))
+        dec_volume = Decimal(str(volume))
+        dec_original_cost = Decimal(str(position.original_cost))
+        dec_total_volume = Decimal(str(position.total_volume))
+        
+        # 计算新的原始平均成本
+        new_total_volume = dec_total_volume + dec_volume
+        if new_total_volume > 0:
+            total_cost = dec_original_cost * dec_total_volume + dec_price * dec_volume
+            position.original_cost = float(total_cost / new_total_volume)
+        else:
+            position.original_cost = float(price)
+        
+        # 买入时动态成本等于原始成本
+        position.dynamic_cost = position.original_cost
+        position.total_volume += volume
+        
+        # 更新持仓金额
+        position.total_amount = position.total_volume * position.original_cost
+        
+        # 如果有最新价格，更新市值和浮动盈亏
+        if position.latest_price:
+            position.update_market_value(position.latest_price)
+    
+    def _update_position_sell(self, position: StockPosition, volume: int, price: float):
+        """
+        处理卖出操作
+        
+        Args:
+            position: 持仓对象
+            volume: 交易量
+            price: 交易价格
+        """
+        # 转换为Decimal以提高精度
+        dec_price = Decimal(str(price))
+        dec_volume = Decimal(str(volume))
+        dec_total_volume = Decimal(str(position.total_volume))
+        
+        # 计算实现的盈亏
+        dec_dynamic_cost = Decimal(str(position.dynamic_cost))
+        realized_profit = (dec_price - dec_dynamic_cost) * dec_volume
+        
+        # 调整剩余持仓的动态成本
+        total_cost = dec_dynamic_cost * dec_total_volume - realized_profit
+        position.total_volume -= volume
+        
+        if position.total_volume > 0:
+            # 更新动态成本
+            position.dynamic_cost = float(total_cost / Decimal(str(position.total_volume)))
+        else:
+            # 清仓时重置所有成本
+            position.original_cost = 0
+            position.dynamic_cost = 0
+            position.original_position_ratio = None
+        
+        # 更新持仓金额
+        position.total_amount = position.total_volume * position.dynamic_cost
+        
+        # 如果有最新价格，更新市值和浮动盈亏
+        if position.latest_price:
+            position.update_market_value(position.latest_price)
+    
+    def _update_position_trim(self, position: StockPosition, volume: int, price: float):
+        """
+        处理减仓操作
+        
+        Args:
+            position: 持仓对象
+            volume: 交易量
+            price: 交易价格
+        """
+        # 减仓本质上也是卖出操作，逻辑与卖出相同
+        self._update_position_sell(position, volume, price)
 
     def update_market_value(self, stock_code: str, latest_price: float) -> Dict[str, Any]:
         """

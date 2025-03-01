@@ -28,8 +28,22 @@
             color: #d9534f;
             font-weight: bold;
         }
+        .add-action {
+            color: #d9534f;
+            font-weight: bold;
+            opacity: 0.8;
+        }
         .sell-action {
             color: #5cb85c;
+            font-weight: bold;
+        }
+        .trim-action {
+            color: #5cb85c;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+        .hold-action {
+            color: #f0ad4e;
             font-weight: bold;
         }
         .inactive-strategy {
@@ -54,8 +68,22 @@
             color: #d9534f;
             font-weight: bold;
         }
+        .add-action {
+            color: #d9534f;
+            font-weight: bold;
+            opacity: 0.8;
+        }
         .sell-action {
             color: #5cb85c;
+            font-weight: bold;
+        }
+        .trim-action {
+            color: #5cb85c;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+        .hold-action {
+            color: #f0ad4e;
             font-weight: bold;
         }
         .success-result {
@@ -247,6 +275,24 @@
         }
         .table-responsive {
             margin-bottom: 2rem;
+        }
+        /* 添加新的操作类型样式 */
+        .execution-buy {
+            border-left: 4px solid #d9534f;
+        }
+        .execution-add {
+            border-left: 4px solid #d9534f;
+            border-left-style: dashed;
+        }
+        .execution-sell {
+            border-left: 4px solid #5cb85c;
+        }
+        .execution-trim {
+            border-left: 4px solid #5cb85c;
+            border-left-style: dashed;
+        }
+        .execution-hold {
+            border-left: 4px solid #f0ad4e;
         }
     </style>
 </head>
@@ -519,7 +565,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">仓位比例</label>
-                            <input type="number" class="form-control" id="editPositionRatio" step="0.01" min="0" max="1" required>
+                            <input type="number" class="form-control" id="editPositionRatio" step="1" min="0" max="100" required>
+                            <div class="form-text">请输入0-100之间的整数，表示百分比</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">价格区间</label>
@@ -561,12 +608,52 @@
         </div>
     </div>
 
+    <!-- 详细错误信息模态框 -->
+    <div class="modal fade" id="detailedErrorModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="errorModalTitle">错误详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="errorModalBody">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     </div>
 </div>
 
 <!-- 引入必要的 JavaScript 库 -->
-<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/axios/1.6.2/axios.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/js/bootstrap.bundle.min.js" 
+        onerror="reportLoadError('Bootstrap JS')"></script>
+<!-- 引入 Axios -->
+<script src="https://cdn.bootcdn.net/ajax/libs/axios/1.6.2/axios.min.js"
+        onerror="reportLoadError('Axios JS')"></script>
+<!-- 备用资源 -->
+<script>
+    // 如果主要资源加载失败，尝试备用资源
+    if (typeof bootstrap === 'undefined') {
+        console.warn('尝试加载备用 Bootstrap 资源');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js';
+        script.onerror = function() { reportLoadError('备用 Bootstrap JS'); };
+        document.body.appendChild(script);
+    }
+    
+    if (typeof axios === 'undefined') {
+        console.warn('尝试加载备用 Axios 资源');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js';
+        script.onerror = function() { reportLoadError('备用 Axios JS'); };
+        document.body.appendChild(script);
+    }
+</script>
 
 <!-- 引入自定义脚本 -->
 <script>
@@ -590,6 +677,10 @@
     
     // 刷新策略列表
     async function refreshStrategies() {
+        const button = document.querySelector('button.btn-outline-primary[onclick="refreshStrategies()"]');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 刷新中...';
+        
         try {
             // 不再传递排序参数，使用后端的默认排序逻辑
             const response = await axios.get('/api/v1/strategies');
@@ -602,6 +693,9 @@
         } catch (error) {
             console.error('获取策略列表失败：', error);
             showToast('获取策略列表失败，请查看控制台了解详情', 'danger');
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新列表';
         }
     }
 
@@ -656,12 +750,12 @@
                     <div class="card-body">
                         <div class="strategy-header">
                             <h5 class="card-title">${strategy.stock_name}（${strategy.stock_code}）</h5>
-                            <span class="${strategy.action === 'buy' ? 'buy-action' : 'sell-action'}">
-                                ${strategy.action === 'buy' ? '买入' : '卖出'}
+                            <span class="${getActionClass(strategy.action)}">
+                                ${getActionText(strategy.action)}
                             </span>
                         </div>
                         <p class="card-text">
-                            仓位：${(strategy.position_ratio * 100).toFixed(0)}%<br>
+                            仓位：${strategy.position_ratio.toFixed(0)}%<br>
                             价格区间：${strategy.price_min} - ${strategy.price_max}<br>
                             ${strategy.take_profit_price ? '止盈价：' + strategy.take_profit_price + '<br>' : ''}
                             ${strategy.stop_loss_price ? '止损价：' + strategy.stop_loss_price + '<br>' : ''}
@@ -771,7 +865,7 @@
                 document.getElementById('editStrategyId').value = strategy.id;
                 document.getElementById('editStockName').value = strategy.stock_name;
                 document.getElementById('editStockCode').value = strategy.stock_code;
-                document.getElementById('editAction').value = strategy.action === 'buy' ? '买入' : '卖出';
+                document.getElementById('editAction').value = getActionText(strategy.action);
                 document.getElementById('editPositionRatio').value = strategy.position_ratio;
                 document.getElementById('editPriceMin').value = strategy.price_min || '';
                 document.getElementById('editPriceMax').value = strategy.price_max || '';
@@ -783,11 +877,11 @@
                 const editStrategyModal = new bootstrap.Modal(document.getElementById('editStrategyModal'));
                 editStrategyModal.show();
             } else {
-                showToast('获取策略信息失败：' + response.data.message, 'danger');
+                showToast('error', response.data.message || '获取策略详情失败');
             }
         } catch (error) {
-            console.error('获取策略信息失败：', error);
-            showToast('获取策略信息失败，请查看控制台了解详情', 'danger');
+            console.error('获取策略详情失败:', error);
+            showToast('error', error.response?.data?.message || '获取策略详情失败');
         }
     }
 
@@ -805,8 +899,8 @@
         };
 
         // 验证仓位比例
-        if (isNaN(data.position_ratio) || data.position_ratio <= 0 || data.position_ratio > 1) {
-            showToast('error', '请输入有效的仓位比例（0-1之间）');
+        if (isNaN(data.position_ratio) || data.position_ratio < 0 || data.position_ratio > 100) {
+            showToast('error', '请输入有效的仓位比例（0-100之间）');
             return;
         }
 
@@ -835,6 +929,10 @@
 
     // 刷新执行记录
     async function refreshExecutions() {
+        const button = document.querySelector('button.refresh-btn[onclick="refreshExecutions()"]');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 刷新中...';
+        
         try {
             const response = await fetch('/api/v1/executions');
             const result = await response.json();
@@ -847,6 +945,9 @@
             }
         } catch (error) {
             console.error('刷新执行记录出错:', error);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新数据';
         }
     }
 
@@ -860,44 +961,7 @@
         }
         
         executions.forEach(execution => {
-            const card = document.createElement('div');
-            card.className = `card execution-card ${execution.action === 'buy' ? 'execution-buy' : 'execution-sell'}`;
-            
-            const resultClass = {
-                'success': 'result-success',
-                'failed': 'result-failed',
-                'partial': 'result-partial'
-            }[execution.execution_result] || '';
-            
-            card.innerHTML = `
-                <div class="card-body py-2">
-                    <div class="execution-title">
-                        <h5>${execution.stock_name}（${execution.stock_code}）</h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="${execution.action === 'buy' ? 'buy-action' : 'sell-action'}">
-                                ${execution.action === 'buy' ? '买入' : '卖出'}
-                            </span>
-                            <span class="execution-result ${resultClass}">
-                                ${execution.execution_result === 'success' ? '执行成功' :
-                                  execution.execution_result === 'failed' ? '执行失败' :
-                                  execution.execution_result === 'partial' ? '部分执行' :
-                                  execution.execution_result}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="execution-info">
-                        <div>执行价格：<span class="position-number">${execution.execution_price}元</span></div>
-                        <div>交易量：<span class="position-number">${execution.volume}股</span></div>
-                        <div>执行时间：${execution.execution_time}</div>
-                    </div>
-                    ${execution.remarks ? `
-                        <div class="execution-remarks">
-                            <i class="bi bi-chat-left-text"></i> ${execution.remarks}
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-            
+            const card = renderExecutionCard(execution);
             container.appendChild(card);
         });
     }
@@ -1049,11 +1113,72 @@
             }
         } catch (error) {
             console.error('执行策略失败:', error);
-            showToast('error', error.response?.data?.message || '执行策略失败');
+            // 特别处理资金不足的错误
+            if (error.response?.data?.message && error.response.data.message.includes('可用资金不足')) {
+                let errorMsg = error.response.data.message;
+                // 显示更友好的错误信息
+                showToast('error', `交易失败：${errorMsg}，请检查账户资金或调整交易量`);
+                // 添加详细提示
+                showDetailedError('资金不足', 
+                    `<p>执行此交易需要的资金超过了您当前的可用资金。</p>
+                     <p>您可以：</p>
+                     <ul>
+                       <li>减少交易数量</li>
+                       <li>等待账户资金增加</li>
+                       <li>卖出其他持仓以释放资金</li>
+                     </ul>`);
+            } else {
+                showToast('error', error.response?.data?.message || '执行策略失败');
+            }
         } finally {
             // 恢复按钮状态
             const executeBtn = document.querySelector('#executeStrategyModal .btn-primary');
             setButtonLoading(executeBtn, false);
+        }
+    }
+
+    // 显示详细错误信息
+    function showDetailedError(title, message) {
+        // 如果模态框不存在，创建它
+        let errorModal = document.getElementById('detailedErrorModal');
+        if (!errorModal) {
+            const modalHTML = `
+                <div class="modal fade" id="detailedErrorModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="errorModalTitle">错误详情</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" id="errorModalBody">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            errorModal = document.getElementById('detailedErrorModal');
+        }
+        
+        // 设置模态框内容
+        document.getElementById('errorModalTitle').textContent = title;
+        document.getElementById('errorModalBody').innerHTML = message;
+        
+        // 显示模态框
+        try {
+            if (typeof bootstrap !== 'undefined') {
+                const modal = new bootstrap.Modal(errorModal);
+                modal.show();
+            } else {
+                console.error('Bootstrap library not loaded');
+                alert(`${title}: ${message.replace(/<[^>]*>/g, '')}`);
+            }
+        } catch (error) {
+            console.error('Error showing modal:', error);
+            alert(`${title}: ${message.replace(/<[^>]*>/g, '')}`);
         }
     }
 
@@ -1415,6 +1540,106 @@
         document.getElementById('executeStrategyId').value = strategyId;
         // 显示模态框
         executeStrategyModal.show();
+    }
+
+    // 添加全局函数用于获取操作类型的样式和文本
+    // 定义一个函数，返回操作类型的样式类名
+    function getActionClass(action) {
+        switch(action) {
+            case 'buy':
+                return 'buy-action';
+            case 'add':
+                return 'add-action';
+            case 'sell':
+                return 'sell-action';
+            case 'trim':
+                return 'trim-action';
+            case 'hold':
+                return 'hold-action';
+            default:
+                return 'buy-action'; // 默认样式
+        }
+    }
+
+    // 定义一个函数，返回操作类型的中文文本
+    function getActionText(action) {
+        switch(action) {
+            case 'buy':
+                return '买入';
+            case 'add':
+                return '加仓';
+            case 'sell':
+                return '卖出';
+            case 'trim':
+                return '减仓';
+            case 'hold':
+                return '持有';
+            default:
+                return action;
+        }
+    }
+    
+    // 定义一个函数，返回执行记录卡片的类名
+    function getExecutionCardClass(action) {
+        switch(action) {
+            case 'buy':
+                return 'execution-buy';
+            case 'add':
+                return 'execution-add';
+            case 'sell':
+                return 'execution-sell';
+            case 'trim':
+                return 'execution-trim';
+            case 'hold':
+                return 'execution-hold';
+            default:
+                return 'execution-buy'; // 默认样式
+        }
+    }
+
+    // 修改执行记录卡片渲染部分
+    function renderExecutionCard(execution) {
+        // 计算执行结果对应的样式类
+        const resultClass = 
+            execution.execution_result === 'success' ? 'success-result' :
+            execution.execution_result === 'failed' ? 'failed-result' :
+            'partial-result';
+        
+        // 计算执行结果对应的文本
+        const resultText = 
+            execution.execution_result === 'success' ? '成功' :
+            execution.execution_result === 'failed' ? '失败' :
+            '部分';
+        
+        const card = document.createElement('div');
+        card.className = `card execution-card ${getExecutionCardClass(execution.action)}`;
+        
+        card.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <h5 class="card-title">${execution.stock_name}（${execution.stock_code}）</h5>
+                    <span class="${getActionClass(execution.action)}">
+                        ${getActionText(execution.action)}
+                    </span>
+                </div>
+                <div class="mb-2">
+                    <span class="execution-result ${resultClass}">
+                        ${resultText}
+                    </span>
+                    <span class="execution-time">
+                        ${execution.execution_time}
+                    </span>
+                </div>
+                <div class="execution-details">
+                    <div>执行价格：<span class="position-number">${execution.execution_price}元</span></div>
+                    <div>交易量：<span class="position-number">${execution.volume}股</span></div>
+                    <div>策略ID：${execution.strategy_id}</div>
+                    ${execution.remarks ? `<div>备注：${execution.remarks}</div>` : ''}
+                </div>
+            </div>
+        `;
+        
+        return card;
     }
 </script>
 </body>

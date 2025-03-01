@@ -27,9 +27,11 @@ class StrategyExecution(db.Model):
     strategy_id = db.Column(db.Integer, db.ForeignKey('stock_strategies.id'), nullable=False, comment='策略ID')
     stock_code = db.Column(db.String(20, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票代码')
     stock_name = db.Column(db.String(100, collation='utf8mb4_unicode_ci'), nullable=False, comment='股票名称')
-    action = db.Column(db.Enum('buy', 'sell', name='action_types'), nullable=False, comment='执行操作')
+    action = db.Column(db.Enum('buy', 'sell', 'add', 'trim', 'hold', name='execution_action_types'), nullable=False, comment='执行操作')
     execution_price = db.Column(db.Float, nullable=False, comment='执行价格')
     volume = db.Column(db.Integer, nullable=False, comment='交易量')
+    position_ratio = db.Column(db.Float, nullable=True, comment='仓位比例')
+    original_position_ratio = db.Column(db.Float, nullable=True, comment='原始买入仓位比例')
     execution_time = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(CN_TIMEZONE), comment='执行时间')
     execution_result = db.Column(db.Enum('success', 'failed', 'partial', name='execution_result_types'), nullable=False, comment='执行结果')
     remarks = db.Column(db.Text(collation='utf8mb4_unicode_ci'), nullable=True, comment='备注说明')
@@ -46,6 +48,8 @@ class StrategyExecution(db.Model):
             'action': self.action,
             'execution_price': self.execution_price,
             'volume': self.volume,
+            'position_ratio': self.position_ratio,
+            'original_position_ratio': self.original_position_ratio,
             'execution_time': self.execution_time.astimezone(CN_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'),
             'execution_result': self.execution_result,
             'remarks': self.remarks,

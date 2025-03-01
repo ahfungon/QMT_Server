@@ -27,8 +27,9 @@ CREATE TABLE IF NOT EXISTS stock_strategies (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '策略ID',
     stock_name VARCHAR(100) NOT NULL COMMENT '股票名称',
     stock_code VARCHAR(20) NOT NULL COMMENT '股票代码',
-    action ENUM('buy', 'sell') NOT NULL COMMENT '执行动作',
-    position_ratio FLOAT NOT NULL COMMENT '操作比例',
+    action ENUM('buy', 'sell', 'add', 'trim', 'hold') NOT NULL COMMENT '执行动作',
+    position_ratio DECIMAL(5,2) NOT NULL COMMENT '操作比例（0-100整数表示百分比）',
+    original_position_ratio DECIMAL(5,2) NULL COMMENT '原始买入仓位比例',
     price_min FLOAT NULL COMMENT '最小执行价',
     price_max FLOAT NULL COMMENT '最大执行价',
     take_profit_price FLOAT NULL COMMENT '止盈价',
@@ -52,9 +53,11 @@ CREATE TABLE IF NOT EXISTS strategy_executions (
     strategy_id INT NOT NULL COMMENT '策略ID',
     stock_code VARCHAR(20) NOT NULL COMMENT '股票代码',
     stock_name VARCHAR(100) NOT NULL COMMENT '股票名称',
-    action ENUM('buy', 'sell') NOT NULL COMMENT '执行操作',
+    action ENUM('buy', 'sell', 'add', 'trim', 'hold') NOT NULL COMMENT '执行操作',
     execution_price FLOAT NOT NULL COMMENT '执行价格',
     volume INT NOT NULL COMMENT '交易量',
+    position_ratio DECIMAL(5,2) NULL COMMENT '仓位比例（0-100整数表示百分比）',
+    original_position_ratio DECIMAL(5,2) NULL COMMENT '原始买入仓位比例',
     execution_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '执行时间',
     execution_result ENUM('success', 'failed', 'partial') NOT NULL COMMENT '执行结果',
     remarks TEXT NULL COMMENT '备注说明',
@@ -80,6 +83,7 @@ CREATE TABLE IF NOT EXISTS stock_positions (
     market_value FLOAT NULL COMMENT '市值',
     floating_profit FLOAT NULL COMMENT '浮动盈亏',
     floating_profit_ratio FLOAT NULL COMMENT '浮动盈亏比例',
+    original_position_ratio DECIMAL(5,2) NULL COMMENT '原始仓位比例（0-100整数表示百分比）',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_stock_code (stock_code),
@@ -92,42 +96,141 @@ CREATE TABLE IF NOT EXISTS stock_positions (
 -- FLUSH PRIVILEGES;
 
 -- 添加一些测试数据（可选）
-INSERT INTO stock_strategies (
-    stock_name, stock_code, action, position_ratio,
-    price_min, price_max, take_profit_price, stop_loss_price,
-    other_conditions, reason, execution_status, is_active,
-    created_at, updated_at
-) VALUES (
-    '掌趣科技', '300315', 'buy', 0.2,
-    5.9, 6.0, 7.5, 5.1,
-    '日线MACD金叉', '技术面向好，估值合理', 'completed', FALSE,
-    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-);
+-- INSERT INTO stock_strategies (
+--     stock_name, stock_code, action, position_ratio,
+--     price_min, price_max, take_profit_price, stop_loss_price,
+--     other_conditions, reason, execution_status, is_active,
+--     created_at, updated_at
+-- ) VALUES (
+--     '掌趣科技', '300315', 'buy', 20.0,
+--     5.9, 6.0, 7.5, 5.1,
+--     '日线MACD金叉', '技术面向好，估值合理', 'completed', FALSE,
+--     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- );
 
-INSERT INTO strategy_executions (
-    strategy_id, stock_code, stock_name, action,
-    execution_price, volume, execution_result, remarks,
-    execution_time, created_at, updated_at
-) VALUES (
-    1, '300315', '掌趣科技', 'buy',
-    5.804, 10100, 'success', '按计划执行完成',
-    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-);
+-- -- 加仓策略测试数据
+-- INSERT INTO stock_strategies (
+--     stock_name, stock_code, action, position_ratio,
+--     price_min, price_max, take_profit_price, stop_loss_price,
+--     other_conditions, reason, execution_status, is_active,
+--     created_at, updated_at
+-- ) VALUES (
+--     '东方财富', '300059', 'add', 10.0,
+--     15.5, 16.0, 19.0, 14.5,
+--     '放量突破', '周线站上MA20，趋势良好', 'pending', TRUE,
+--     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- );
 
-INSERT INTO stock_positions (
-    stock_code, stock_name, total_volume, original_cost, dynamic_cost, total_amount,
-    latest_price, market_value, floating_profit, floating_profit_ratio
-) VALUES (
-    '300315', '掌趣科技', 10100, 5.804, 5.804, 58620.4,
-    5.804, 58620.4, 0, 0
-);
+-- -- 减仓策略测试数据
+-- INSERT INTO stock_strategies (
+--     stock_name, stock_code, action, position_ratio,
+--     price_min, price_max, take_profit_price, stop_loss_price,
+--     other_conditions, reason, execution_status, is_active,
+--     created_at, updated_at
+-- ) VALUES (
+--     '中国平安', '601318', 'trim', 15.0,
+--     40.5, 41.0, NULL, NULL,
+--     '减少高估值持仓', '临近阻力位，获利了结部分仓位', 'pending', TRUE,
+--     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- );
 
--- 4. 更新账户资金（扣除买入金额）
-UPDATE account_funds 
-SET 
-    available_funds = available_funds - 58620.4,
-    total_assets = available_funds + frozen_funds + 58620.4,
-    total_profit = total_assets - initial_assets,
-    total_profit_ratio = ((total_assets - initial_assets) / initial_assets) * 100,
-    updated_at = CURRENT_TIMESTAMP 
-WHERE id = 1; 
+-- -- 持有策略测试数据
+-- INSERT INTO stock_strategies (
+--     stock_name, stock_code, action, position_ratio,
+--     price_min, price_max, take_profit_price, stop_loss_price,
+--     other_conditions, reason, execution_status, is_active,
+--     created_at, updated_at
+-- ) VALUES (
+--     '贵州茅台', '600519', 'hold', 20.0,
+--     NULL, NULL, 2100.0, 1800.0,
+--     '估值合理，业绩稳定', '维持现有仓位，等待业绩释放', 'pending', TRUE,
+--     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- );
+
+-- -- 卖出策略测试数据
+-- INSERT INTO stock_strategies (
+--     stock_name, stock_code, action, position_ratio,
+--     price_min, price_max, take_profit_price, stop_loss_price,
+--     other_conditions, reason, execution_status, is_active,
+--     created_at, updated_at
+-- ) VALUES (
+--     '万科A', '000002', 'sell', 100.0,
+--     18.6, 19.0, NULL, NULL,
+--     '成交量持续萎缩', '地产股持续承压，规避风险', 'pending', TRUE,
+--     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- );
+
+-- INSERT INTO strategy_executions (
+--     strategy_id, stock_code, stock_name, action,
+--     execution_price, volume, position_ratio, original_position_ratio, execution_result, remarks,
+--     execution_time, created_at, updated_at
+-- ) VALUES (
+--     1, '300315', '掌趣科技', 'buy',
+--     5.804, 10100, 20.0, 20.0, 'success', '按计划执行完成',
+--     NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY
+-- );
+
+-- -- 添加持仓记录
+-- INSERT INTO stock_positions (
+--     stock_code, stock_name, total_volume, original_cost, dynamic_cost,
+--     total_amount, latest_price, market_value, floating_profit, floating_profit_ratio,
+--     original_position_ratio, created_at, updated_at
+-- ) VALUES (
+--     '300315', '掌趣科技', 10100, 5.804, 5.804,
+--     58620.4, 5.58, 56358.0, -2262.4, -0.0386,
+--     20.0, NOW(), NOW()
+-- );
+
+-- -- 东方财富持仓记录
+-- INSERT INTO stock_positions (
+--     stock_code, stock_name, total_volume, original_cost, dynamic_cost,
+--     total_amount, latest_price, market_value, floating_profit, floating_profit_ratio,
+--     original_position_ratio, created_at, updated_at
+-- ) VALUES (
+--     '300059', '东方财富', 5000, 15.2, 15.2,
+--     76000.0, 15.8, 79000.0, 3000.0, 0.0395,
+--     25.0, NOW(), NOW()
+-- );
+
+-- -- 中国平安持仓记录
+-- INSERT INTO stock_positions (
+--     stock_code, stock_name, total_volume, original_cost, dynamic_cost,
+--     total_amount, latest_price, market_value, floating_profit, floating_profit_ratio,
+--     original_position_ratio, created_at, updated_at
+-- ) VALUES (
+--     '601318', '中国平安', 2000, 39.5, 39.5,
+--     79000.0, 40.2, 80400.0, 1400.0, 0.0177,
+--     25.0, NOW(), NOW()
+-- );
+
+-- -- 贵州茅台持仓记录
+-- INSERT INTO stock_positions (
+--     stock_code, stock_name, total_volume, original_cost, dynamic_cost,
+--     total_amount, latest_price, market_value, floating_profit, floating_profit_ratio,
+--     original_position_ratio, created_at, updated_at
+-- ) VALUES (
+--     '600519', '贵州茅台', 50, 1850.0, 1850.0,
+--     92500.0, 1950.0, 97500.0, 5000.0, 0.0541,
+--     30.0, NOW(), NOW()
+-- );
+
+-- -- 万科A持仓记录
+-- INSERT INTO stock_positions (
+--     stock_code, stock_name, total_volume, original_cost, dynamic_cost,
+--     total_amount, latest_price, market_value, floating_profit, floating_profit_ratio,
+--     original_position_ratio, created_at, updated_at
+-- ) VALUES (
+--     '000002', '万科A', 2000, 18.0, 18.0,
+--     36000.0, 18.5, 37000.0, 1000.0, 0.0278,
+--     10.0, NOW(), NOW()
+-- );
+
+-- -- 4. 更新账户资金（扣除买入金额）
+-- UPDATE account_funds 
+-- SET 
+--     available_funds = available_funds - 58620.4,
+--     total_assets = available_funds + frozen_funds + 58620.4,
+--     total_profit = total_assets - initial_assets,
+--     total_profit_ratio = ((total_assets - initial_assets) / initial_assets) * 100,
+--     updated_at = CURRENT_TIMESTAMP 
+-- WHERE id = 1; 

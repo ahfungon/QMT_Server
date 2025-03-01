@@ -29,7 +29,7 @@ class ExecutionService:
             data: 执行记录数据，包含以下字段：
                 - strategy_id: 策略ID
                 - execution_price: 执行价格
-                - volume: 交易量
+                - volume: 交易量（可选，如果不提供则根据策略计算）
                 - strategy_status: 策略执行状态（'partial' 或 'completed'）
                 - remarks: 备注说明（可选）
             
@@ -38,7 +38,7 @@ class ExecutionService:
         """
         try:
             # 验证必要字段
-            required_fields = ['strategy_id', 'execution_price', 'volume', 'strategy_status']
+            required_fields = ['strategy_id', 'execution_price', 'strategy_status']
             for field in required_fields:
                 if field not in data or data[field] is None:
                     raise ValueError(f"缺少必要字段: {field}")
@@ -52,6 +52,16 @@ class ExecutionService:
             if not strategy:
                 raise ValueError(f"策略ID {data['strategy_id']} 不存在")
             
+            # 根据操作类型计算交易量（如果未提供）
+            volume = data.get('volume')
+            if volume is None:
+                # 根据不同操作类型计算交易量
+                volume = self._calculate_trade_volume(strategy, data['execution_price'])
+                
+                # 如果是持有操作，则不需要交易
+                if strategy.action == 'hold':
+                    volume = 0
+            
             # 自动填充策略相关信息
             execution_data = {
                 'strategy_id': data['strategy_id'],
@@ -59,7 +69,9 @@ class ExecutionService:
                 'stock_name': strategy.stock_name,
                 'action': strategy.action,
                 'execution_price': data['execution_price'],
-                'volume': data['volume'],
+                'volume': volume,
+                'position_ratio': strategy.position_ratio,
+                'original_position_ratio': strategy.original_position_ratio,
                 'execution_result': 'success',  # 默认执行成功
                 'remarks': data.get('remarks', '')
             }
@@ -72,18 +84,61 @@ class ExecutionService:
             strategy.execution_status = data['strategy_status']
             logger.info(f"策略 {strategy.id} 状态更新为: {data['strategy_status']}")
             
+            # 如果是持有操作，则不更新持仓
+            if strategy.action == 'hold':
+                logger.info(f"策略 {strategy.id} 是持有操作，不更新持仓")
+                db.session.commit()
+                return execution.to_dict()
+            
             # 更新持仓信息
             try:
                 position = self.position_service.update_position(
                     stock_code=strategy.stock_code,
                     stock_name=strategy.stock_name,
-                    volume=data['volume'],
+                    volume=volume,
                     price=data['execution_price'],
-                    action=strategy.action
+                    action=strategy.action,
+                    position_ratio=strategy.position_ratio,
+                    original_position_ratio=strategy.original_position_ratio
                 )
                 logger.info(f"持仓更新成功: {position}")
+                
+                # 更新账户资金
+                if strategy.action in ['buy', 'add']:
+                    # 买入/加仓操作需要扣除资金
+                    total_cost = volume * data['execution_price']
+                    from ..services.account import AccountService
+                    account_service = AccountService()
+                    account = account_service.get_account_funds()
+                    
+                    # 检查资金是否足够
+                    if account['available_funds'] < total_cost:
+                        logger.error(f"可用资金不足: 需要 {total_cost}，当前可用 {account['available_funds']}")
+                        raise ValueError(f"可用资金不足: 需要 {total_cost}，当前可用 {account['available_funds']}")
+                    
+                    # 更新账户资金
+                    new_available_funds = account['available_funds'] - total_cost
+                    account_service.update_funds(
+                        available_funds=new_available_funds,
+                        frozen_funds=account['frozen_funds']
+                    )
+                    logger.info(f"账户资金更新成功: 扣除 {total_cost}，剩余可用资金 {new_available_funds}")
+                elif strategy.action in ['sell', 'trim']:
+                    # 卖出/减仓操作需要增加资金
+                    total_income = volume * data['execution_price']
+                    from ..services.account import AccountService
+                    account_service = AccountService()
+                    account = account_service.get_account_funds()
+                    
+                    # 更新账户资金
+                    new_available_funds = account['available_funds'] + total_income
+                    account_service.update_funds(
+                        available_funds=new_available_funds,
+                        frozen_funds=account['frozen_funds']
+                    )
+                    logger.info(f"账户资金更新成功: 增加 {total_income}，可用资金增加到 {new_available_funds}")
             except Exception as e:
-                logger.error(f"持仓更新失败: {str(e)}")
+                logger.error(f"持仓或资金更新失败: {str(e)}")
                 raise
             
             db.session.commit()
@@ -92,6 +147,69 @@ class ExecutionService:
             db.session.rollback()
             logger.error(f"创建执行记录失败: {str(e)}", exc_info=True)
             raise
+    
+    def _calculate_trade_volume(self, strategy: StockStrategy, price: float) -> int:
+        """
+        根据策略类型计算交易量
+        
+        Args:
+            strategy: 策略对象
+            price: 交易价格
+            
+        Returns:
+            int: 计算得到的交易量
+        """
+        # 获取账户资金信息
+        from ..services.account import AccountService
+        account_service = AccountService()
+        account = account_service.get_account_funds()
+        
+        # 获取持仓信息
+        position = StockPosition.query.filter_by(stock_code=strategy.stock_code).first()
+        
+        # 根据不同操作类型计算交易量
+        if strategy.action in ['buy', 'add']:
+            # 买入/加仓：根据总资产和仓位比例计算
+            trade_amount = account['total_assets'] * strategy.position_ratio / 100
+            volume = int(trade_amount / price)
+            logger.info(f"买入/加仓交易量计算: 总资产={account['total_assets']}, "
+                        f"仓位比例={strategy.position_ratio}%, 价格={price}, 计算得到交易量={volume}")
+            return volume
+            
+        elif strategy.action == 'sell':
+            # 卖出：根据持仓数量和仓位比例计算
+            if not position:
+                logger.warning(f"没有持仓，无法执行卖出操作")
+                return 0
+                
+            volume = int(position.total_volume * strategy.position_ratio / 100)
+            logger.info(f"卖出交易量计算: 持仓数量={position.total_volume}, "
+                        f"卖出比例={strategy.position_ratio}%, 计算得到交易量={volume}")
+            return volume
+            
+        elif strategy.action == 'trim':
+            # 减仓：根据持仓数量、原始仓位和目标减仓比例计算
+            if not position:
+                logger.warning(f"没有持仓，无法执行减仓操作")
+                return 0
+                
+            if not position.original_position_ratio or position.original_position_ratio <= 0:
+                logger.warning(f"原始仓位比例无效，使用当前持仓全部数量作为基准")
+                # 如果没有原始仓位比例记录，则按照sell逻辑处理
+                volume = int(position.total_volume * strategy.position_ratio / 100)
+            else:
+                # 减仓特殊计算逻辑：
+                # 交易量 = 当前持股数量 × (目标减仓比例 ÷ 原始买入仓位比例)
+                volume = int(position.total_volume * (strategy.position_ratio / position.original_position_ratio))
+                
+            logger.info(f"减仓交易量计算: 持仓数量={position.total_volume}, "
+                        f"原始仓位比例={position.original_position_ratio}%, "
+                        f"目标减仓比例={strategy.position_ratio}%, 计算得到交易量={volume}")
+            return volume
+            
+        else:  # 包括 'hold' 操作
+            # 持有操作不涉及实际交易
+            return 0
     
     def get_execution(self, execution_id: int) -> Optional[Dict[str, Any]]:
         """

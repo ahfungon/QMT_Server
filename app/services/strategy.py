@@ -80,9 +80,15 @@ class StrategyService:
             if 'position_ratio' not in data or data['position_ratio'] is None:
                 # 根据交易动作设置默认仓位
                 if data.get('action') == 'sell':
-                    data['position_ratio'] = 0.5  # 卖出默认仓位 50%
+                    data['position_ratio'] = 50  # 卖出默认仓位 50%
+                elif data.get('action') == 'add':
+                    data['position_ratio'] = 10  # 加仓默认仓位 10%
+                elif data.get('action') == 'trim':
+                    data['position_ratio'] = 30  # 减仓默认仓位 30%
+                elif data.get('action') == 'hold':
+                    data['position_ratio'] = 0   # 持有操作仓位为 0
                 else:
-                    data['position_ratio'] = 0.1  # 买入默认仓位 10%
+                    data['position_ratio'] = 10  # 买入默认仓位 10%
             
             strategy = StockStrategy(**data)
             db.session.add(strategy)
