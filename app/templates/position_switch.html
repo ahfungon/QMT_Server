@@ -1,0 +1,293 @@
+<!-- 页面头部 -->
+<div class="page-header">
+    <h1 class="page-title">持仓管理</h1>
+    <div class="header-actions">
+        <!-- 视图切换控件 -->
+        <div class="view-switch">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary" data-view="table" title="表格视图">
+                    <i class="fas fa-table"></i>
+                    <span class="btn-text">表格</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary" data-view="card" title="卡片视图">
+                    <i class="fas fa-th-large"></i>
+                    <span class="btn-text">卡片</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 刷新按钮 -->
+        <button class="btn btn-outline-secondary refresh-btn" onclick="refreshData()" title="刷新数据">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 加载动画 -->
+<div class="loading-overlay" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">加载中...</span>
+    </div>
+</div>
+
+<!-- 视图容器 -->
+<div class="view-container">
+    <!-- 表格视图 -->
+    <div id="table-view" class="view-content">
+        {% include 'position.html' %}
+    </div>
+
+    <!-- 卡片视图 -->
+    <div id="card-view" class="view-content" style="display: none;">
+        {% include 'position_card.html' %}
+    </div>
+</div>
+
+<style>
+/* 页面头部样式 */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 1rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* 视图切换样式 */
+.view-switch .btn-group {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.view-switch .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.view-switch .btn:hover {
+    background: #f8f9fa;
+}
+
+.view-switch .btn.active {
+    background: #007bff;
+    color: #fff;
+}
+
+.view-switch .btn i {
+    font-size: 1.1rem;
+}
+
+/* 刷新按钮样式 */
+.refresh-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.refresh-btn i {
+    font-size: 1.1rem;
+}
+
+.refresh-btn:hover {
+    transform: rotate(180deg);
+}
+
+/* 加载动画样式 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+/* 视图容器样式 */
+.view-container {
+    position: relative;
+    min-height: 200px;
+}
+
+.view-content {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+
+.view-content.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .view-switch .btn-text {
+        display: none;
+    }
+    
+    .view-switch .btn {
+        padding: 0.5rem;
+        width: 40px;
+        justify-content: center;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .page-header {
+        background: #1a1a1a;
+        border-bottom-color: #333;
+    }
+    
+    .page-title {
+        color: #fff;
+    }
+    
+    .view-switch .btn-group {
+        background: #2c2c2c;
+    }
+    
+    .view-switch .btn:hover {
+        background: #333;
+    }
+    
+    .loading-overlay {
+        background: rgba(0,0,0,0.8);
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const viewButtons = document.querySelectorAll('.view-switch button');
+    const views = document.querySelectorAll('.view-content');
+    const loadingOverlay = document.querySelector('.loading-overlay');
+    
+    // 检查本地存储中的视图偏好
+    const preferredView = localStorage.getItem('positionView') || 'table';
+    
+    // 初始化视图
+    showView(preferredView);
+    
+    // 为按钮添加点击事件
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const view = this.dataset.view;
+            showView(view);
+            localStorage.setItem('positionView', view);
+        });
+    });
+    
+    // 显示指定视图
+    function showView(view) {
+        // 更新按钮状态
+        viewButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.view === view);
+        });
+        
+        // 更新视图显示
+        views.forEach(content => {
+            const isActive = content.id === `${view}-view`;
+            content.style.display = isActive ? 'block' : 'none';
+            
+            // 添加动画效果
+            setTimeout(() => {
+                content.classList.toggle('active', isActive);
+            }, 50);
+        });
+    }
+    
+    // 检查屏幕宽度并自动切换到合适的视图
+    function checkScreenWidth() {
+        if (window.innerWidth <= 768 && localStorage.getItem('positionView') !== 'card') {
+            showView('card');
+            localStorage.setItem('positionView', 'card');
+        }
+    }
+    
+    // 刷新数据
+    window.refreshData = function() {
+        // 显示加载动画
+        loadingOverlay.style.display = 'flex';
+        
+        // 添加旋转动画到刷新按钮
+        const refreshBtn = document.querySelector('.refresh-btn');
+        refreshBtn.style.transform = 'rotate(360deg)';
+        
+        // 模拟数据刷新
+        setTimeout(() => {
+            // 隐藏加载动画
+            loadingOverlay.style.display = 'none';
+            // 重置刷新按钮
+            refreshBtn.style.transform = '';
+            // 这里添加实际的数据刷新逻辑
+        }, 1000);
+    }
+    
+    // 页面加载和窗口调整时检查屏幕宽度
+    checkScreenWidth();
+    window.addEventListener('resize', checkScreenWidth);
+    
+    // 添加下拉刷新功能（仅在移动端）
+    if ('ontouchstart' in window) {
+        let touchStartY = 0;
+        let touchMoveY = 0;
+        
+        document.addEventListener('touchstart', e => {
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchmove', e => {
+            touchMoveY = e.touches[0].clientY;
+            const distance = touchMoveY - touchStartY;
+            
+            if (distance > 50 && window.scrollY === 0) {
+                e.preventDefault();
+                refreshData();
+            }
+        });
+    }
+});
+</script> 

@@ -10,6 +10,7 @@ from datetime import datetime
 from ..models import db
 from ..models.execution import StrategyExecution
 from ..models.stock import StockStrategy
+from ..models.position import StockPosition
 from .position import PositionService
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,41 @@ class ExecutionService:
                 if strategy.action == 'hold':
                     volume = 0
             
+            # 获取当前持仓信息
+            position = StockPosition.query.filter_by(stock_code=strategy.stock_code).first()
+            
+            # 计算原始仓位比例
+            original_position_ratio = strategy.original_position_ratio
+            if strategy.action == 'add' and position:
+                if data['strategy_status'] == 'completed':
+                    # 全部完成时，直接累加原始仓位比例
+                    original_position_ratio = (position.original_position_ratio or 0) + strategy.position_ratio
+                    logger.info(f"加仓全部完成：原始仓位比例从 {position.original_position_ratio} 更新为 {original_position_ratio}")
+                else:
+                    # 部分完成时，按实际执行比例计算
+                    target_volume = self._calculate_trade_volume(strategy, data['execution_price'])
+                    actual_ratio = volume / target_volume if target_volume > 0 else 0
+                    add_ratio = strategy.position_ratio * actual_ratio
+                    original_position_ratio = (position.original_position_ratio or 0) + add_ratio
+                    logger.info(f"加仓部分完成：实际比例 {actual_ratio:.2%}, 原始仓位比例从 {position.original_position_ratio} 更新为 {original_position_ratio}")
+            
+            elif strategy.action == 'trim' and position:
+                if position.original_position_ratio:
+                    if data['strategy_status'] == 'completed':
+                        # 全部完成时，直接减去减仓比例
+                        original_position_ratio = position.original_position_ratio - strategy.position_ratio
+                        logger.info(f"减仓全部完成：原始仓位比例从 {position.original_position_ratio} 更新为 {original_position_ratio}")
+                    else:
+                        # 部分完成时，按实际执行比例计算
+                        target_volume = self._calculate_trade_volume(strategy, data['execution_price'])
+                        actual_ratio = volume / target_volume if target_volume > 0 else 0
+                        trim_ratio = strategy.position_ratio * actual_ratio
+                        original_position_ratio = position.original_position_ratio - trim_ratio
+                        logger.info(f"减仓部分完成：实际比例 {actual_ratio:.2%}, 原始仓位比例从 {position.original_position_ratio} 更新为 {original_position_ratio}")
+                else:
+                    original_position_ratio = None
+                    logger.warning("减仓操作：没有原始仓位比例记录")
+            
             # 自动填充策略相关信息
             execution_data = {
                 'strategy_id': data['strategy_id'],
@@ -71,7 +107,7 @@ class ExecutionService:
                 'execution_price': data['execution_price'],
                 'volume': volume,
                 'position_ratio': strategy.position_ratio,
-                'original_position_ratio': strategy.original_position_ratio,
+                'original_position_ratio': original_position_ratio,
                 'execution_result': 'success',  # 默认执行成功
                 'remarks': data.get('remarks', '')
             }
@@ -99,7 +135,7 @@ class ExecutionService:
                     price=data['execution_price'],
                     action=strategy.action,
                     position_ratio=strategy.position_ratio,
-                    original_position_ratio=strategy.original_position_ratio
+                    original_position_ratio=original_position_ratio
                 )
                 logger.info(f"持仓更新成功: {position}")
                 

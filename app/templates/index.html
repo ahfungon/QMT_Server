@@ -370,6 +370,7 @@
                                     <th>股票名称</th>
                                     <th>股票代码</th>
                                     <th>持仓数量</th>
+                                    <th>原始仓位</th>
                                     <th>原始成本</th>
                                     <th>动态成本</th>
                                     <th>最新价格</th>
@@ -755,7 +756,7 @@
                             </span>
                         </div>
                         <p class="card-text">
-                            仓位：${strategy.position_ratio.toFixed(0)}%<br>
+                            仓位：${strategy.position_ratio}%<br>
                             价格区间：${strategy.price_min} - ${strategy.price_max}<br>
                             ${strategy.take_profit_price ? '止盈价：' + strategy.take_profit_price + '<br>' : ''}
                             ${strategy.stop_loss_price ? '止损价：' + strategy.stop_loss_price + '<br>' : ''}
@@ -889,7 +890,7 @@
     async function updateStrategy() {
         const strategyId = document.getElementById('editStrategyId').value;
         const data = {
-            position_ratio: parseFloat(document.getElementById('editPositionRatio').value),
+            position_ratio: parseInt(document.getElementById('editPositionRatio').value),
             price_min: parseFloat(document.getElementById('editPriceMin').value) || null,
             price_max: parseFloat(document.getElementById('editPriceMax').value) || null,
             take_profit_price: parseFloat(document.getElementById('editTakeProfitPrice').value) || null,
@@ -1328,6 +1329,7 @@
                 <td>${position.stock_name}</td>
                 <td>${position.stock_code}</td>
                 <td class="text-end">${position.total_volume}</td>
+                <td class="text-end">${position.original_position_ratio ? position.original_position_ratio + '%' : '-'}</td>
                 <td class="text-end">${formatMoney(position.original_cost)}</td>
                 <td class="text-end">${formatMoney(position.dynamic_cost)}</td>
                 <td class="text-end">${formatMoney(position.latest_price)}</td>
@@ -1354,6 +1356,7 @@
         totalRow.innerHTML = `
             <td colspan="2" class="text-center">合计</td>
             <td class="text-end">${totalVolume}</td>
+            <td class="text-end">-</td>
             <td class="text-end">-</td>
             <td class="text-end">-</td>
             <td class="text-end">-</td>

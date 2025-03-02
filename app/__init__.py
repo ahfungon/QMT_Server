@@ -98,12 +98,14 @@ def create_app(config_name=None):
             raise
     
     # 注册蓝图
-    from .routes import strategy_bp, execution_bp, home_bp, position_bp, account_bp
+    from .routes import strategy_bp, execution_bp, home_bp, position_bp, account_bp, health_bp, root_health_bp
     app.register_blueprint(home_bp)
     app.register_blueprint(strategy_bp, url_prefix='/api/v1')
     app.register_blueprint(execution_bp, url_prefix='/api/v1')
     app.register_blueprint(position_bp, url_prefix='/api/v1')
     app.register_blueprint(account_bp, url_prefix='/api/v1')
+    app.register_blueprint(health_bp)
+    app.register_blueprint(root_health_bp)
     
     # 启动股价自动更新
     from .tasks.price_updater import PriceUpdater

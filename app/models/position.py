@@ -97,21 +97,24 @@ class StockPosition(db.Model):
             if volume > self.total_volume:
                 raise ValueError("卖出数量超过当前持仓量")
             
-            # 计算实现的盈亏
+            # 使用新公式计算卖出后的动态成本
+            # 新成本价 = (原持仓数量 × 原成本价 - 卖出数量 × 卖出价) / (原持仓数量 - 卖出数量)
             dec_dynamic_cost = Decimal(str(self.dynamic_cost))
-            realized_profit = (dec_price - dec_dynamic_cost) * dec_volume
+            remaining_volume = dec_total_volume - dec_volume
             
-            # 调整剩余持仓的动态成本
-            total_cost = dec_dynamic_cost * dec_total_volume - realized_profit
-            self.total_volume -= volume
-            
-            if self.total_volume > 0:
-                # 更新动态成本
-                self.dynamic_cost = float(total_cost / Decimal(str(self.total_volume)))
+            if remaining_volume > 0:
+                # 计算新的动态成本
+                new_total_cost = dec_dynamic_cost * dec_total_volume - dec_price * dec_volume
+                self.dynamic_cost = float(new_total_cost / remaining_volume)
+                # 如果计算结果为负数，设置为0
+                if self.dynamic_cost < 0:
+                    self.dynamic_cost = 0
             else:
                 # 清仓时重置所有成本
                 self.original_cost = 0
                 self.dynamic_cost = 0
+            
+            self.total_volume -= volume
         
         # 更新持仓金额
         self.total_amount = self.total_volume * (self.dynamic_cost if action == 'sell' else self.original_cost)

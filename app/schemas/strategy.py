@@ -12,7 +12,7 @@ class StrategyBase(BaseModel):
     stock_name: str = Field(..., description="股票名称")
     stock_code: str = Field(..., description="股票代码", pattern="^[0-9]{6}$")
     action: str = Field(..., description="执行动作", pattern="^(buy|sell)$")
-    position_ratio: float = Field(..., description="操作比例", ge=0, le=1)
+    position_ratio: float = Field(..., description="操作比例", ge=0, le=100)
     price_min: Optional[float] = Field(None, description="最小执行价")
     price_max: Optional[float] = Field(None, description="最大执行价")
     take_profit_price: Optional[float] = Field(None, description="止盈价")

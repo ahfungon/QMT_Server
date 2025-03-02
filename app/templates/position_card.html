@@ -1,0 +1,348 @@
+<!-- 卡片式持仓列表 -->
+<div class="position-cards">
+    {% for position in positions %}
+    <div class="position-card" data-code="{{ position.stock_code }}">
+        <!-- 股票信息头部 -->
+        <div class="card-header">
+            <div class="stock-info">
+                <h5 class="stock-name">{{ position.stock_name }}</h5>
+                <span class="stock-code">{{ position.stock_code }}</span>
+            </div>
+            <div class="price-info">
+                <div class="latest-price {{ 'text-success' if position.floating_profit > 0 else 'text-danger' }}">
+                    {{ "%.3f"|format(position.latest_price) }}
+                </div>
+                <div class="price-change {{ 'text-success' if position.floating_profit > 0 else 'text-danger' }}">
+                    <i class="fas {{ 'fa-arrow-up' if position.floating_profit > 0 else 'fa-arrow-down' }}"></i>
+                    {{ "%.2f"|format(position.floating_profit_ratio) }}%
+                </div>
+            </div>
+        </div>
+        
+        <!-- 持仓信息 -->
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>持仓数量</label>
+                    <div class="value">{{ position.total_volume }}股</div>
+                </div>
+                <div class="info-item">
+                    <label>成本价格</label>
+                    <div class="value">{{ "%.3f"|format(position.dynamic_cost) }}</div>
+                </div>
+                <div class="info-item">
+                    <label>浮动盈亏</label>
+                    <div class="value {{ 'text-success' if position.floating_profit > 0 else 'text-danger' }}">
+                        {{ "%.2f"|format(position.floating_profit) }}
+                    </div>
+                </div>
+                <div class="info-item">
+                    <label>市值</label>
+                    <div class="value">{{ "%.2f"|format(position.market_value) }}</div>
+                </div>
+            </div>
+            
+            <!-- 图表占位符 -->
+            <div class="chart-container">
+                <canvas id="chart-{{ position.stock_code }}"></canvas>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="card-footer">
+            <button class="btn btn-primary btn-sm btn-with-icon" onclick="handleAdd('{{ position.stock_code }}')">
+                <i class="fas fa-plus-circle"></i>
+                <span>加仓</span>
+            </button>
+            <button class="btn btn-warning btn-sm btn-with-icon" onclick="handleTrim('{{ position.stock_code }}')">
+                <i class="fas fa-minus-circle"></i>
+                <span>减仓</span>
+            </button>
+            <button class="btn btn-danger btn-sm btn-with-icon" onclick="handleSell('{{ position.stock_code }}')">
+                <i class="fas fa-times-circle"></i>
+                <span>清仓</span>
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+/* 卡片式布局样式 */
+.position-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 1.5rem;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.position-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.position-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+}
+
+/* 卡片头部样式 */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.2rem;
+    background: linear-gradient(to right, #f8f9fa, #fff);
+    border-bottom: 1px solid #eee;
+}
+
+.stock-info {
+    flex: 1;
+}
+
+.stock-name {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.stock-code {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.2rem;
+    display: block;
+}
+
+.price-info {
+    text-align: right;
+}
+
+.latest-price {
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.price-change {
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3rem;
+    margin-top: 0.2rem;
+}
+
+/* 卡片内容样式 */
+.card-body {
+    padding: 1.2rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.info-item {
+    background: #f8f9fa;
+    padding: 0.8rem;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.info-item:hover {
+    background: #e9ecef;
+}
+
+.info-item label {
+    display: block;
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.3rem;
+}
+
+.info-item .value {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.chart-container {
+    height: 120px;
+    margin-top: 1rem;
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+}
+
+/* 卡片底部样式 */
+.card-footer {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+}
+
+.btn-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 90px;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-with-icon:hover {
+    transform: translateY(-2px);
+}
+
+.btn-with-icon i {
+    font-size: 1rem;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+    .position-cards {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .position-card {
+        margin-bottom: 0;
+    }
+    
+    .card-header {
+        padding: 1rem;
+    }
+    
+    .stock-name {
+        font-size: 1.1rem;
+    }
+    
+    .latest-price {
+        font-size: 1.2rem;
+    }
+    
+    .info-grid {
+        gap: 0.8rem;
+    }
+    
+    .info-item {
+        padding: 0.6rem;
+    }
+    
+    .info-item .value {
+        font-size: 1rem;
+    }
+    
+    .chart-container {
+        height: 100px;
+    }
+    
+    .card-footer {
+        padding: 0.8rem;
+    }
+    
+    .btn-with-icon {
+        min-width: 80px;
+        font-size: 0.9rem;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .position-card {
+        background: #1a1a1a;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+    
+    .card-header {
+        background: linear-gradient(to right, #2c2c2c, #1a1a1a);
+        border-bottom-color: #333;
+    }
+    
+    .stock-name {
+        color: #fff;
+    }
+    
+    .stock-code {
+        color: #888;
+    }
+    
+    .info-item {
+        background: #2c2c2c;
+    }
+    
+    .info-item:hover {
+        background: #333;
+    }
+    
+    .info-item label {
+        color: #888;
+    }
+    
+    .info-item .value {
+        color: #fff;
+    }
+    
+    .card-footer {
+        background: #2c2c2c;
+        border-top-color: #333;
+    }
+}
+</style>
+
+<script>
+// 初始化图表
+function initCharts() {
+    document.querySelectorAll('.chart-container canvas').forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        // 这里可以添加实际的图表绘制代码
+        // 使用Chart.js或其他图表库
+    });
+}
+
+// 操作处理函数
+function handleAdd(stockCode) {
+    // 添加加仓操作的动画效果
+    const card = document.querySelector(`.position-card[data-code="${stockCode}"]`);
+    card.style.transform = 'scale(1.02)';
+    setTimeout(() => card.style.transform = '', 200);
+    // 这里添加实际的加仓逻辑
+}
+
+function handleTrim(stockCode) {
+    // 添加减仓操作的动画效果
+    const card = document.querySelector(`.position-card[data-code="${stockCode}"]`);
+    card.style.transform = 'scale(0.98)';
+    setTimeout(() => card.style.transform = '', 200);
+    // 这里添加实际的减仓逻辑
+}
+
+function handleSell(stockCode) {
+    // 添加清仓操作的动画效果
+    const card = document.querySelector(`.position-card[data-code="${stockCode}"]`);
+    card.style.opacity = '0.5';
+    setTimeout(() => card.style.opacity = '', 200);
+    // 这里添加实际的清仓逻辑
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+});
+</script> 

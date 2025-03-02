@@ -256,10 +256,26 @@ class PositionService:
             if action in ['sell', 'trim'] and volume > position.total_volume:
                 raise ValueError(f"{action}数量 {volume} 超过持仓数量 {position.total_volume}")
             
-            # 对买入/加仓操作，记录原始仓位比例
-            if action in ['buy', 'add'] and position_ratio:
+            # 更新原始仓位比例
+            if action == 'buy':
+                # 首次买入，直接设置原始仓位比例
                 position.original_position_ratio = position_ratio
-                
+                logger.info(f"首次买入：设置原始仓位比例为 {position_ratio}")
+            elif action == 'add':
+                # 加仓操作，累加原始仓位比例
+                current_ratio = position.original_position_ratio or 0
+                position.original_position_ratio = current_ratio + position_ratio
+                logger.info(f"加仓操作：原始仓位比例从 {current_ratio} 更新为 {position.original_position_ratio}")
+            elif action == 'trim' and original_position_ratio is not None:
+                # 减仓操作，直接使用执行记录服务计算好的原始仓位比例
+                position.original_position_ratio = original_position_ratio
+                logger.info(f"减仓操作：更新原始仓位比例为 {original_position_ratio}")
+            elif action == 'sell':
+                # 卖出操作，如果是清仓则清除原始仓位比例
+                if volume == position.total_volume:
+                    position.original_position_ratio = None
+                    logger.info("清仓操作：清除原始仓位比例")
+            
             # 更新持仓信息
             if action in ['buy', 'add']:
                 # 买入或加仓操作，基本逻辑相同
@@ -334,22 +350,25 @@ class PositionService:
         dec_volume = Decimal(str(volume))
         dec_total_volume = Decimal(str(position.total_volume))
         
-        # 计算实现的盈亏
+        # 使用新公式计算卖出后的动态成本
+        # 新成本价 = (原持仓数量 × 原成本价 - 卖出数量 × 卖出价) / (原持仓数量 - 卖出数量)
         dec_dynamic_cost = Decimal(str(position.dynamic_cost))
-        realized_profit = (dec_price - dec_dynamic_cost) * dec_volume
+        remaining_volume = dec_total_volume - dec_volume
         
-        # 调整剩余持仓的动态成本
-        total_cost = dec_dynamic_cost * dec_total_volume - realized_profit
-        position.total_volume -= volume
-        
-        if position.total_volume > 0:
-            # 更新动态成本
-            position.dynamic_cost = float(total_cost / Decimal(str(position.total_volume)))
+        if remaining_volume > 0:
+            # 计算新的动态成本
+            new_total_cost = dec_dynamic_cost * dec_total_volume - dec_price * dec_volume
+            position.dynamic_cost = float(new_total_cost / remaining_volume)
+            # 如果计算结果为负数，设置为0
+            if position.dynamic_cost < 0:
+                position.dynamic_cost = 0
         else:
             # 清仓时重置所有成本
             position.original_cost = 0
             position.dynamic_cost = 0
             position.original_position_ratio = None
+        
+        position.total_volume -= volume
         
         # 更新持仓金额
         position.total_amount = position.total_volume * position.dynamic_cost

@@ -1,0 +1,114 @@
+<!-- 添加响应式表格容器 -->
+<div class="table-responsive">
+    <table class="table position-table">
+        <thead>
+            <tr>
+                <th>股票</th>
+                <th>持仓/成本</th>
+                <th>盈亏/比例</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for position in positions %}
+            <tr>
+                <!-- 股票信息列 -->
+                <td class="stock-info">
+                    <div class="stock-name">{{ position.stock_name }}</div>
+                    <div class="stock-code text-muted">{{ position.stock_code }}</div>
+                </td>
+                <!-- 持仓成本列 -->
+                <td class="position-cost">
+                    <div>{{ position.total_volume }}股</div>
+                    <div class="text-muted">{{ "%.3f"|format(position.dynamic_cost) }}</div>
+                </td>
+                <!-- 盈亏信息列 -->
+                <td class="profit-info">
+                    <div class="{{ 'text-success' if position.floating_profit > 0 else 'text-danger' }}">
+                        {{ "%.2f"|format(position.floating_profit) }}
+                    </div>
+                    <div class="{{ 'text-success' if position.floating_profit_ratio > 0 else 'text-danger' }}">
+                        {{ "%.2f"|format(position.floating_profit_ratio) }}%
+                    </div>
+                </td>
+                <!-- 操作按钮列 -->
+                <td class="actions">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary">加仓</button>
+                        <button class="btn btn-sm btn-outline-warning">减仓</button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+/* 响应式样式 */
+@media screen and (max-width: 768px) {
+    /* 表格容器横向滚动 */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 调整表格布局 */
+    .position-table {
+        min-width: 100%;
+        font-size: 0.875rem;
+    }
+    
+    /* 紧凑化单元格内容 */
+    .position-table td {
+        padding: 0.5rem;
+        vertical-align: middle;
+    }
+    
+    /* 股票信息列样式 */
+    .stock-info {
+        min-width: 80px;
+    }
+    .stock-name {
+        font-weight: 500;
+    }
+    .stock-code {
+        font-size: 0.75rem;
+    }
+    
+    /* 持仓成本列样式 */
+    .position-cost {
+        min-width: 70px;
+    }
+    
+    /* 盈亏信息列样式 */
+    .profit-info {
+        min-width: 70px;
+    }
+    
+    /* 操作按钮列样式 */
+    .actions {
+        min-width: 90px;
+    }
+    .actions .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* 极小屏幕优化 */
+@media screen and (max-width: 375px) {
+    .position-table {
+        font-size: 0.75rem;
+    }
+    
+    .actions .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .actions .btn {
+        margin: 0.1rem 0;
+    }
+}
+</style> 
