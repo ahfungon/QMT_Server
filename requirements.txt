@@ -1,27 +1,42 @@
+# Web 框架和扩展
 Flask==3.0.2
 Flask-SQLAlchemy==3.1.1
 Flask-CORS==4.0.0
+Werkzeug==3.0.1
+Flask-Migrate==4.0.5
+
+# 数据库
 PyMySQL==1.1.0
-python-dotenv==1.0.1
 SQLAlchemy==2.0.27
+alembic==1.13.1
+
+# AI 和 API
 zhipuai==2.1.5.20250106
+openai==1.12.0
+httpx>=0.24.1
+
+# 工具库
+python-dotenv==1.0.1
 jsonschema==4.23.0
 requests==2.31.0
 pytz==2024.1
 urllib3==1.26.18
-openai==1.12.0
-httpx>=0.24.1
 cryptography==42.0.2
+concurrent-log-handler==0.9.24
 
 # 测试相关
-pytest==8.0.1
+pytest==7.4.3
 pytest-cov==4.1.0
 pytest-mock==3.12.0
-
-# 日志处理
-Werkzeug==3.0.1
+pytest-asyncio==0.23.5
+coverage==7.4.1
 
 # 开发工具
 black==24.1.1
 flake8==7.0.0
 isort==5.13.2
+mypy==1.8.0
+pylint==3.0.3
+
+# 性能监控
+prometheus-client==0.19.0

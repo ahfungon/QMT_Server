@@ -116,15 +116,37 @@ class ExecutionService:
             execution = StrategyExecution(**execution_data)
             db.session.add(execution)
             
-            # 更新策略执行状态
-            strategy.execution_status = data['strategy_status']
-            logger.info(f"策略 {strategy.id} 状态更新为: {data['strategy_status']}")
-            
-            # 如果是持有操作，则不更新持仓
+            # 如果是持有操作，直接设置为完成状态
             if strategy.action == 'hold':
-                logger.info(f"策略 {strategy.id} 是持有操作，不更新持仓")
+                strategy.execution_status = 'completed'
+                strategy.is_active = False  # 持有操作完成后设置为失效
+                logger.info(f"策略 {strategy.id} 是持有操作，直接设置为完全执行并失效")
                 db.session.commit()
                 return execution.to_dict()
+            
+            # 获取该策略的所有执行记录（包括当前新增的）
+            query = db.select(StrategyExecution).filter_by(
+                strategy_id=strategy.id,
+                execution_result='success'
+            )
+            all_executions = db.session.execute(query).scalars().all()
+            
+            # 计算已执行的总量（包括当前执行量）
+            total_executed_volume = sum(e.volume for e in all_executions)
+            
+            # 计算目标交易量
+            target_volume = self._calculate_trade_volume(strategy, data['execution_price'])
+            
+            # 根据累计执行比例确定状态
+            execution_ratio = total_executed_volume / target_volume if target_volume > 0 else 0
+            
+            if execution_ratio >= 0.999:  # 考虑浮点数精度，用0.999代替1.0
+                strategy.execution_status = 'completed'
+                strategy.is_active = False  # 完全执行后设置为失效
+                logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，设置为完全执行并失效")
+            else:
+                strategy.execution_status = 'partial'
+                logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，设置为部分执行")
             
             # 更新持仓信息
             try:

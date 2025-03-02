@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional
 from ..models import db
 from ..models.stock import StockStrategy
 from ai_robot import create_ai_processor
+from ..models.execution import StrategyExecution
+from .execution import ExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ class StrategyService:
     def __init__(self):
         """初始化AI处理器"""
         self.ai_processor = create_ai_processor()
+        self.execution_service = ExecutionService()
     
     def analyze_strategy(self, strategy_text: str) -> Dict[str, Any]:
         """分析策略文本"""
@@ -111,12 +114,40 @@ class StrategyService:
             logger.info(f"更新策略前的数据: {strategy.to_dict()}")
             logger.info(f"更新的数据: {data}")
             
-            # 检查是否需要更新执行状态
-            if 'position_ratio' in data and strategy.execution_status == 'completed':
-                # 如果新的仓位比例大于原来的，则更新状态为部分执行
-                if data['position_ratio'] > strategy.position_ratio:
-                    data['execution_status'] = 'partial'
-                    logger.info(f"策略 {strategy_id} 的仓位比例增加，状态更新为部分执行")
+            # 如果是持有操作，直接设置为完成状态
+            if strategy.action == 'hold':
+                data['execution_status'] = 'completed'
+                strategy.is_active = False  # 持有操作完成后设置为失效
+                logger.info(f"策略 {strategy.id} 是持有操作，状态更新为完全执行并设置为失效")
+            else:
+                # 获取已执行的总量
+                executions = StrategyExecution.query.filter_by(
+                    strategy_id=strategy.id,
+                    execution_result='success'
+                ).all()
+                
+                if executions:  # 只有存在执行记录时才计算执行状态
+                    # 计算已执行的总量
+                    total_executed_volume = sum(e.volume for e in executions)
+                    
+                    # 计算目标交易量
+                    target_volume = self._calculate_trade_volume(strategy, data.get('price_max', 0))
+                    
+                    # 计算执行比例
+                    execution_ratio = total_executed_volume / target_volume if target_volume > 0 else 0
+                    
+                    # 根据执行比例更新状态
+                    if execution_ratio >= 0.999:  # 考虑浮点数精度，用0.999代替1.0
+                        data['execution_status'] = 'completed'
+                        strategy.is_active = False  # 完全执行后设置为失效
+                        logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，状态更新为完全执行并设置为失效")
+                    else:
+                        data['execution_status'] = 'partial'
+                        logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，状态更新为部分执行")
+                else:
+                    # 如果没有执行记录，设置为待执行状态
+                    data['execution_status'] = 'pending'
+                    logger.info(f"策略 {strategy.id} 没有执行记录，状态更新为待执行")
             
             # 更新字段
             for key, value in data.items():
@@ -191,11 +222,37 @@ class StrategyService:
                     raise ValueError(f"字段 {field} 不能为空")
             
             # 检查是否需要更新执行状态
-            if 'position_ratio' in data and strategy.execution_status == 'completed':
-                # 如果新的仓位比例大于原来的，则更新状态为部分执行
-                if data['position_ratio'] > strategy.position_ratio:
-                    data['execution_status'] = 'partial'
-                    logger.info(f"策略 {strategy.id} 的仓位比例增加，状态更新为部分执行")
+            if 'position_ratio' in data:
+                # 如果是持有操作，直接设置为完成状态
+                if strategy.action == 'hold':
+                    data['execution_status'] = 'completed'
+                    strategy.is_active = False  # 持有操作完成后设置为失效
+                    logger.info(f"策略 {strategy.id} 是持有操作，状态更新为完全执行并设置为失效")
+                else:
+                    # 获取已执行的总量
+                    executions = StrategyExecution.query.filter_by(
+                        strategy_id=strategy.id,
+                        execution_result='success'
+                    ).all()
+                    
+                    # 计算已执行的总量
+                    total_executed_volume = sum(e.volume for e in executions)
+                    
+                    # 计算目标交易量（使用最新的仓位比例）
+                    strategy.position_ratio = data.get('position_ratio', strategy.position_ratio)
+                    target_volume = self._calculate_trade_volume(strategy, data.get('price_max', 0))
+                    
+                    # 计算执行比例
+                    execution_ratio = total_executed_volume / target_volume if target_volume > 0 else 0
+                    
+                    # 根据执行比例更新状态
+                    if execution_ratio >= 0.999:  # 考虑浮点数精度，用0.999代替1.0
+                        data['execution_status'] = 'completed'
+                        strategy.is_active = False  # 完全执行后设置为失效
+                        logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，状态更新为完全执行并设置为失效")
+                    else:
+                        data['execution_status'] = 'partial'
+                        logger.info(f"策略 {strategy.id} 累计执行比例 {execution_ratio:.2%}，状态更新为部分执行")
             
             # 更新字段
             has_updates = False
@@ -346,4 +403,17 @@ class StrategyService:
             
         except Exception as e:
             logger.error(f"查询策略列表失败: {str(e)}", exc_info=True)
-            raise 
+            raise
+    
+    def _calculate_trade_volume(self, strategy: StockStrategy, price: float) -> int:
+        """
+        根据策略类型计算交易量
+        
+        Args:
+            strategy: 策略对象
+            price: 交易价格
+            
+        Returns:
+            int: 计算得到的交易量
+        """
+        return self.execution_service._calculate_trade_volume(strategy, price) 
