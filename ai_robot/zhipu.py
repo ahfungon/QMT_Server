@@ -41,7 +41,7 @@ class ZhipuAIProcessor(BaseAIProcessor):
                 # 调用智谱 AI 接口
                 self.logger.info(f"调用智谱AI (第 {current_retry + 1} 次尝试)")
                 response = self.client.chat.completions.create(
-                    model="glm-4-plus",
+                    model="glm-4-flash",
                     messages=messages,
                     temperature=0.1,
                     max_tokens=2000
