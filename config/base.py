@@ -28,10 +28,18 @@ class BaseConfig:
     
     # 数据库配置
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # 使用默认值处理可能的空环境变量
+    MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+    MYSQL_PORT = os.getenv('MYSQL_PORT', '3306')
+    MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', '')
+    
     SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
-        f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/"
-        f"{os.getenv('MYSQL_DATABASE')}?charset=utf8mb4"
+        f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@"
+        f"{MYSQL_HOST}:{MYSQL_PORT}/"
+        f"{MYSQL_DATABASE}?charset=utf8mb4"
     )
     
     # 数据库连接池配置

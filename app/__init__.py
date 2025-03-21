@@ -59,11 +59,22 @@ def create_app(config_name=None):
     # 创建数据库表
     with app.app_context():
         try:
+            # 获取数据库连接参数（直接从环境变量获取，避免通过配置读取）
+            MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+            MYSQL_PORT = os.getenv('MYSQL_PORT', '3306')
+            MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+            MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+            MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', '')
+            
+            # 打印一下环境变量检查
+            logging.info(f"数据库连接参数: HOST={MYSQL_HOST}, PORT={MYSQL_PORT}, USER={MYSQL_USER}, DB={MYSQL_DATABASE}")
+            
             # 尝试创建数据库（如果不存在）
-            database_name = app.config['SQLALCHEMY_DATABASE_URI'].split('/')[-1].split('?')[0]
+            database_name = MYSQL_DATABASE
             
             # 创建到 MySQL 服务器的连接（不指定数据库）
-            base_url = app.config['SQLALCHEMY_DATABASE_URI'].rsplit('/', 1)[0]
+            base_url = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}"
+            logging.info(f"基础连接URL: {base_url}")
             engine_without_db = db.create_engine(base_url)
             
             # 检查数据库是否存在
